@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>베이킹 발주 관리</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif;font-size:14px;background:#f5f4f0;color:#1a1a18;min-height:100vh}
+header{background:#fff;border-bottom:1px solid #e5e4e0;padding:0 1rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:50}
+.logo{font-size:16px;font-weight:600}
+.logo span{font-size:12px;font-weight:400;color:#888;margin-left:6px}
+.nav{display:flex}
+.nav-btn{padding:8px 14px;font-size:13px;cursor:pointer;border:none;background:none;color:#666;border-bottom:2px solid transparent;transition:.15s;font-family:inherit}
+.nav-btn.active{color:#1a1a18;border-bottom:2px solid #1a1a18;font-weight:500}
+.main{max-width:720px;margin:0 auto;padding:1.25rem 1rem}
+.card{background:#fff;border:1px solid #e5e4e0;border-radius:12px;padding:1rem 1.25rem;margin-bottom:12px}
+label{font-size:12px;color:#666;display:block;margin-bottom:3px}
+input,select,textarea{font-family:inherit;font-size:14px;color:#1a1a18;background:#fff;border:1px solid #d5d4d0;border-radius:8px;padding:8px 10px;width:100%;transition:.15s}
+input:focus,select:focus,textarea:focus{outline:none;border-color:#888}
+button{font-family:inherit;font-size:13px;cursor:pointer;border-radius:8px;border:1px solid #d5d4d0;background:#fff;color:#1a1a18;padding:7px 14px;transition:.15s}
+button:hover{background:#f5f4f0}
+button:active{transform:scale(.98)}
+.btn-primary{background:#1a1a18;color:#fff;border-color:#1a1a18}
+.btn-primary:hover{background:#333}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-danger{color:#c0392b;border-color:#e5b4b0}
+.btn-danger:hover{background:#fef0ef}
+.row{display:flex;gap:8px;align-items:flex-end;margin-bottom:10px}
+.flex-1{flex:1}.flex-2{flex:2}
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem}
+.stat{background:#f5f4f0;border-radius:8px;padding:.75rem 1rem;text-align:center}
+.stat-label{font-size:11px;color:#888;margin-bottom:4px}
+.stat-val{font-size:20px;font-weight:600}
+.badge{display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500}
+.b-amber{background:#faeeda;color:#633806}
+.b-teal{background:#e1f5ee;color:#085041}
+.b-purple{background:#eeedfe;color:#3c3489}
+.b-green{background:#eaf3de;color:#27500a}
+.result-row{display:grid;grid-template-columns:1fr 110px 80px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #f0efeb}
+.result-row:last-child{border-bottom:none}
+.plan-card{border:1px solid #e5e4e0;border-radius:10px;padding:.875rem 1rem;margin-bottom:8px;background:#fff;display:flex;justify-content:space-between;align-items:center}
+.count-ctrl{display:flex;align-items:center;gap:8px}
+.count-btn{width:28px;height:28px;border-radius:6px;border:1px solid #d5d4d0;background:#fff;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;padding:0}
+.count-num{font-size:18px;font-weight:600;min-width:32px;text-align:center}
+.ing-row{display:grid;grid-template-columns:1fr 80px 70px 30px;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #f0efeb}
+.ing-row:last-child{border-bottom:none}
+.step-row{display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-bottom:1px solid #f0efeb}
+.step-row:last-child{border-bottom:none}
+.step-num-badge{width:24px;height:24px;border-radius:50%;background:#1a1a18;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;margin-top:6px}
+.recipe-card{border:1px solid #e5e4e0;border-radius:10px;margin-bottom:8px;background:#fff;overflow:hidden}
+.recipe-card-body{padding:1rem 1.25rem}
+.recipe-thumb{width:80px;height:80px;border-radius:8px;object-fit:cover;flex-shrink:0}
+.recipe-thumb-placeholder{width:80px;height:80px;border-radius:8px;background:#f5f4f0;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0}
+.tag{display:inline-block;background:#f5f4f0;border:1px solid #e5e4e0;border-radius:6px;padding:3px 8px;font-size:12px;margin:2px}
+.history-card{border:1px solid #e5e4e0;border-radius:10px;padding:1rem 1.25rem;margin-bottom:8px;background:#fff}
+.empty{text-align:center;color:#aaa;padding:3rem 0}
+.empty-icon{font-size:32px;margin-bottom:8px}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:480px;margin:auto}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.modal-title{font-size:16px;font-weight:600}
+.close-btn{background:none;border:none;font-size:20px;cursor:pointer;color:#888;padding:0}
+.toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:.3s;pointer-events:none}
+.toast.show{opacity:1}
+.photo-preview{width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:none}
+.photo-preview.show{display:block}
+.gdrive-tip{background:#e8f4fd;border:1px solid #b3d9f7;border-radius:8px;padding:10px 12px;font-size:12px;color:#1a5276;line-height:1.7;margin-bottom:10px}
+
+/* 프린트 스타일 */
+@media print {
+  header, .nav, button, .modal-bg, .toast { display:none !important }
+  body { background:#fff }
+  .main { padding:0; max-width:100% }
+  #tab-plan, #tab-history { display:none !important }
+  #tab-recipe { display:block !important }
+  .recipe-card { break-inside:avoid; page-break-inside:avoid; border:1px solid #ddd; margin-bottom:20px }
+  .print-hide { display:none !important }
+  .print-show { display:block !important }
+}
+.print-show { display:none }
+
+@media print {
+  #print-target { display:block !important }
+}
+#print-target { display:none }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">베이킹 발주 <span>학원 공유</span></div>
+  <nav class="nav">
+    <button class="nav-btn active" onclick="switchTab('plan')">수업계획</button>
+    <button class="nav-btn" onclick="switchTab('recipe')">레시피</button>
+    <button class="nav-btn" onclick="switchTab('history')">발주이력</button>
+  </nav>
+</header>
+
+<div class="main">
+
+  <!-- 수업 계획 탭 -->
+  <div id="tab-plan" style="display:block">
+    <div class="stat-grid">
+      <div class="stat"><div class="stat-label">수업 종류</div><div class="stat-val" id="s-cls">0</div></div>
+      <div class="stat"><div class="stat-label">총 인원</div><div class="stat-val" id="s-stu">0</div></div>
+      <div class="stat"><div class="stat-label">재료 종류</div><div class="stat-val" id="s-ing">0</div></div>
+    </div>
+    <div class="card">
+      <div style="font-size:13px;font-weight:500;color:#666;margin-bottom:10px">수업 추가</div>
+      <div class="row">
+        <div class="flex-2"><label>레시피</label><select id="plan-recipe"><option value="">선택...</option></select></div>
+        <div class="flex-1"><label>인원(명)</label><input type="number" id="plan-count" value="1" min="1" style="text-align:center"></div>
+        <button class="btn-primary" onclick="addPlanItem()" style="white-space:nowrap;margin-bottom:1px">+ 추가</button>
+      </div>
+    </div>
+    <div id="plan-list"><div class="empty"><div class="empty-icon">📋</div>수업을 추가해 주세요</div></div>
+    <div id="result-section" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:1rem 0 8px">
+        <div style="font-weight:600;font-size:15px">재료 합산 발주 목록</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" onclick="copyOrderText()">📋 복사</button>
+          <button class="btn-sm" onclick="clearPlan()">초기화</button>
+          <button class="btn-primary btn-sm" onclick="saveOrderFromPlan()">발주 저장</button>
+        </div>
+      </div>
+      <div class="card" style="padding:.75rem 1.25rem">
+        <div style="display:grid;grid-template-columns:1fr 110px 80px;gap:8px;padding:4px 0 8px;border-bottom:1px solid #f0efeb">
+          <div style="font-size:12px;color:#888">재료명</div>
+          <div style="font-size:12px;color:#888">총 수량</div>
+          <div style="font-size:12px;color:#888">발주단위</div>
+        </div>
+        <div id="result-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 레시피 탭 -->
+  <div id="tab-recipe" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="display:flex;gap:6px">
+        <select id="recipe-filter-cat" onchange="renderRecipes()" style="width:130px;font-size:13px">
+          <option value="">전체 카테고리</option>
+          <option>제과기능사</option><option>제빵기능사</option><option>홈베이커리</option>
+          <option>채식베이커리</option><option>디저트</option><option>기타</option>
+        </select>
+        <input type="text" id="recipe-search" placeholder="레시피 검색..." oninput="renderRecipes()" style="width:150px;font-size:13px">
+      </div>
+      <div style="display:flex;gap:6px">
+        <button onclick="printAllRecipes()" class="btn-sm">🖨️ 전체 인쇄</button>
+        <button class="btn-primary" onclick="openRecipeModal()">+ 레시피 등록</button>
+      </div>
+    </div>
+    <div id="recipe-list"></div>
+  </div>
+
+  <!-- 발주 이력 탭 -->
+  <div id="tab-history" style="display:none">
+    <div id="history-list"></div>
+  </div>
+
+</div>
+
+<!-- 레시피 등록/수정 모달 -->
+<div class="modal-bg" id="recipe-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">레시피 등록</div>
+      <button class="close-btn" onclick="closeRecipeModal()">✕</button>
+    </div>
+
+    <label>레시피명</label>
+    <input type="text" id="r-name" placeholder="예: 마들렌" style="margin-bottom:10px">
+
+    <label>카테고리</label>
+    <select id="r-cat" style="margin-bottom:12px">
+      <option>제과기능사</option><option>제빵기능사</option><option>홈베이커리</option>
+      <option>채식베이커리</option><option>디저트</option><option>기타</option>
+    </select>
+
+    <label>제품 사진 URL</label>
+    <div class="gdrive-tip">
+      📌 구글 드라이브 사용법:<br>
+      1. 드라이브에 사진 업로드<br>
+      2. 사진 우클릭 → <b>공유 → 링크 복사</b><br>
+      3. 복사한 링크를 아래에 붙여넣기
+    </div>
+    <input type="text" id="r-photo" placeholder="https://drive.google.com/..." oninput="previewPhoto()" style="margin-bottom:8px">
+    <img id="r-photo-preview" class="photo-preview" alt="사진 미리보기">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px">
+      <div style="font-size:13px;font-weight:500;color:#666">재료 (1인분 기준)</div>
+      <button class="btn-sm" onclick="addIngRow()">+ 재료 추가</button>
+    </div>
+    <div id="ing-editor" style="margin-bottom:14px"></div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:13px;font-weight:500;color:#666">만드는 과정</div>
+      <button class="btn-sm" onclick="addStepRow()">+ 단계 추가</button>
+    </div>
+    <div id="step-editor" style="margin-bottom:14px"></div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="closeRecipeModal()">취소</button>
+      <button class="btn-primary" onclick="saveRecipe()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 레시피 상세/프린트 모달 -->
+<div class="modal-bg" id="detail-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title" id="detail-modal-title">레시피 상세</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="btn-sm" onclick="printRecipe()">🖨️ 인쇄</button>
+        <button class="close-btn" onclick="document.getElementById('detail-modal').classList.remove('open')">✕</button>
+      </div>
+    </div>
+    <div id="detail-modal-content"></div>
+  </div>
+</div>
+
+<!-- 인쇄용 숨김 영역 -->
+<div id="print-target"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var API_URL = 'https://script.google.com/macros/s/AKfycbygIviI2Jpl3q6TYcjrwXpcCld6N_tHwoR33Dw3FTdr3ZeG9GyQnbM-qGq5gJzjI5fR/exec';
+var recipes = [], planItems = [], editingId = null, tempIngs = [], tempSteps = [];
+var printingRecipe = null;
+var CAT_CLS = {'제과기능사':'b-amber','제빵기능사':'b-teal','홈베이커리':'b-purple','채식베이커리':'b-green','디저트':'b-purple','기타':'b-teal'};
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2200);
+}
+
+function catBadge(cat) {
+  return '<span class="badge ' + (CAT_CLS[cat]||'b-teal') + '">' + cat + '</span>';
+}
+
+// 구글 드라이브 URL → 직접 이미지 URL 변환
+function convertDriveUrl(url) {
+  if (!url) return '';
+  var m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
+  return url;
+}
+
+function previewPhoto() {
+  var url = convertDriveUrl(document.getElementById('r-photo').value.trim());
+  var img = document.getElementById('r-photo-preview');
+  if (url) { img.src = url; img.classList.add('show'); }
+  else { img.classList.remove('show'); }
+}
+
+async function api(action, body) {
+  try {
+    var opts = body
+      ? { method: 'POST', body: JSON.stringify(Object.assign({ action: action }, body)) }
+      : { method: 'GET' };
+    var url = body ? API_URL : API_URL + '?action=' + action;
+    var res = await fetch(url, opts);
+    return await res.json();
+  } catch(e) {
+    showToast('연결 오류: ' + e.message);
+    return null;
+  }
+}
+
+async function loadAll() {
+  await Promise.all([loadRecipes(), loadHistory()]);
+}
+
+async function loadRecipes() {
+  var data = await api('getRecipes');
+  if (!data) return;
+  recipes = data.recipes || [];
+  refreshRecipeSelect();
+  renderRecipes();
+}
+
+async function loadHistory() {
+  var data = await api('getOrders');
+  if (!data) return;
+  renderHistory(data.orders || []);
+}
+
+function refreshRecipeSelect() {
+  var sel = document.getElementById('plan-recipe');
+  sel.innerHTML = '<option value="">레시피 선택...</option>' +
+    recipes.map(function(r){ return '<option value="' + r.id + '">' + r.name + ' (' + r.cat + ')</option>'; }).join('');
+}
+
+// ── 수업 계획 ──────────────────────────────────────────
+function addPlanItem() {
+  var rid = document.getElementById('plan-recipe').value;
+  var cnt = parseInt(document.getElementById('plan-count').value) || 1;
+  if (!rid) { showToast('레시피를 선택해 주세요'); return; }
+  var rec = recipes.find(function(r){ return r.id == rid; });
+  if (!rec) return;
+  var exist = planItems.find(function(p){ return p.recipeId == rid; });
+  if (exist) { exist.count += cnt; }
+  else { planItems.push({ recipeId: rid, name: rec.name, cat: rec.cat, count: cnt }); }
+  document.getElementById('plan-count').value = 1;
+  renderPlan();
+}
+
+function renderPlan() {
+  var el = document.getElementById('plan-list');
+  var rs = document.getElementById('result-section');
+  if (!planItems.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div>수업을 추가해 주세요</div>';
+    rs.style.display = 'none';
+    updateStats(0,0,0); return;
+  }
+  el.innerHTML = '<div style="font-size:13px;font-weight:500;color:#666;margin-bottom:8px">이번 주 수업</div>' +
+    planItems.map(function(p, i){
+      return '<div class="plan-card">' +
+        '<div><div style="font-weight:500;margin-bottom:3px">' + p.name + ' ' + catBadge(p.cat) + '</div>' +
+        '<div style="font-size:12px;color:#888">수강 인원</div></div>' +
+        '<div style="display:flex;align-items:center;gap:8px">' +
+        '<div class="count-ctrl">' +
+        '<button class="count-btn" onclick="chgCount(' + i + ',-1)">−</button>' +
+        '<span class="count-num">' + p.count + '</span>' +
+        '<button class="count-btn" onclick="chgCount(' + i + ',1)">+</button>' +
+        '<span style="font-size:13px;color:#888">명</span></div>' +
+        '<button onclick="rmPlan(' + i + ')" style="border:none;background:none;cursor:pointer;color:#aaa;font-size:16px">✕</button></div></div>';
+    }).join('');
+  rs.style.display = 'block';
+  calcResult();
+}
+
+function chgCount(i,d){ planItems[i].count = Math.max(1, planItems[i].count + d); renderPlan(); }
+function rmPlan(i){ planItems.splice(i,1); renderPlan(); }
+function clearPlan(){ if(!confirm('초기화하시겠습니까?'))return; planItems=[]; renderPlan(); }
+
+function calcResult() {
+  var totals = {};
+  planItems.forEach(function(p) {
+    var rec = recipes.find(function(r){ return r.id == p.recipeId; });
+    if (!rec) return;
+    rec.ings.forEach(function(ing) {
+      var key = ing.name + '__' + ing.unit;
+      if (!totals[key]) totals[key] = { name: ing.name, unit: ing.unit, total: 0, srcs: [] };
+      totals[key].total += ing.qty * p.count;
+      totals[key].srcs.push(p.name + ' ' + p.count + '명');
+    });
+  });
+  var entries = Object.values(totals);
+  document.getElementById('result-list').innerHTML = entries.map(function(e) {
+    var disp = Math.round(e.total * 10) / 10;
+    var guide = '';
+    if (e.unit==='g' && e.total>=1000) guide = '≈' + Math.round(e.total/100)/10 + 'kg';
+    else if (e.unit==='ml' && e.total>=1000) guide = '≈' + Math.round(e.total/100)/10 + 'L';
+    else if (e.unit==='개') guide = '총 ' + Math.ceil(e.total) + '개';
+    return '<div class="result-row">' +
+      '<div><div style="font-weight:500">' + e.name + '</div>' +
+      '<div style="font-size:11px;color:#888">' + e.srcs.join(' / ') + '</div></div>' +
+      '<div style="font-size:15px;font-weight:600">' + disp + ' ' + e.unit + '</div>' +
+      '<div style="font-size:12px;color:#888">' + guide + '</div></div>';
+  }).join('');
+  updateStats(planItems.length, planItems.reduce(function(s,p){ return s+p.count; }, 0), entries.length);
+}
+
+function updateStats(c,s,i) {
+  document.getElementById('s-cls').textContent = c;
+  document.getElementById('s-stu').textContent = s;
+  document.getElementById('s-ing').textContent = i;
+}
+
+function copyOrderText() {
+  var totals = {};
+  planItems.forEach(function(p) {
+    var rec = recipes.find(function(r){ return r.id == p.recipeId; });
+    if (!rec) return;
+    rec.ings.forEach(function(ing) {
+      var key = ing.name + '__' + ing.unit;
+      if (!totals[key]) totals[key] = { name: ing.name, unit: ing.unit, total: 0 };
+      totals[key].total += ing.qty * p.count;
+    });
+  });
+  var date = new Date().toLocaleDateString('ko-KR');
+  var lines = ['[베이킹 발주] ' + date, '수업: ' + planItems.map(function(p){ return p.name+' '+p.count+'명'; }).join(', '), ''];
+  Object.values(totals).forEach(function(e){ lines.push(e.name + ' ' + Math.round(e.total*10)/10 + e.unit); });
+  navigator.clipboard.writeText(lines.join('\n')).then(function(){ showToast('클립보드에 복사됐어요!'); });
+}
+
+async function saveOrderFromPlan() {
+  if (!planItems.length) { showToast('수업을 추가해 주세요'); return; }
+  var totals = {};
+  planItems.forEach(function(p) {
+    var rec = recipes.find(function(r){ return r.id == p.recipeId; });
+    if (!rec) return;
+    rec.ings.forEach(function(ing) {
+      var key = ing.name + '__' + ing.unit;
+      if (!totals[key]) totals[key] = { name: ing.name, unit: ing.unit, total: 0 };
+      totals[key].total += ing.qty * p.count;
+    });
+  });
+  var order = {
+    date: new Date().toLocaleDateString('ko-KR'),
+    classes: planItems.map(function(p){ return p.name+' '+p.count+'명'; }).join(', '),
+    items: Object.values(totals).map(function(e){ return { name: e.name, qty: Math.round(e.total*10)/10, unit: e.unit }; })
+  };
+  var res = await api('saveOrder', { order: order });
+  if (res && res.success) {
+    showToast('발주가 저장됐어요!');
+    planItems = []; renderPlan(); loadHistory();
+  }
+}
+
+// ── 레시피 ────────────────────────────────────────────
+function renderRecipes() {
+  var q = (document.getElementById('recipe-search').value || '').toLowerCase();
+  var fc = document.getElementById('recipe-filter-cat').value;
+  var filtered = recipes.filter(function(r) {
+    return (!q || r.name.toLowerCase().includes(q)) && (!fc || r.cat === fc);
+  });
+  var el = document.getElementById('recipe-list');
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📖</div>레시피가 없습니다</div>'; return;
+  }
+  el.innerHTML = filtered.map(function(r) {
+    var photoUrl = convertDriveUrl(r.photo || '');
+    var photoHtml = photoUrl
+      ? '<img src="' + photoUrl + '" class="recipe-thumb" onerror="this.style.display=\'none\'">'
+      : '<div class="recipe-thumb-placeholder">🍞</div>';
+    var stepsCount = (r.steps || []).length;
+    return '<div class="recipe-card">' +
+      '<div class="recipe-card-body">' +
+      '<div style="display:flex;gap:12px;align-items:flex-start">' +
+      photoHtml +
+      '<div style="flex:1">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">' +
+      '<div><span style="font-weight:600;font-size:15px">' + r.name + '</span> ' + catBadge(r.cat) + '</div>' +
+      '<div style="display:flex;gap:5px">' +
+      '<button class="btn-sm" onclick="showDetail(' + r.id + ')">📋 상세</button>' +
+      '<button class="btn-sm" onclick="editRecipe(' + r.id + ')">수정</button>' +
+      '<button class="btn-sm btn-danger" onclick="deleteRecipe(' + r.id + ')">삭제</button></div></div>' +
+      '<div style="font-size:12px;color:#888;margin-bottom:5px">재료 ' + r.ings.length + '가지' + (stepsCount ? ' · 과정 ' + stepsCount + '단계' : '') + '</div>' +
+      '<div>' + r.ings.map(function(i){ return '<span class="tag">' + i.name + ' ' + i.qty + i.unit + '</span>'; }).join('') + '</div>' +
+      '</div></div></div></div>';
+  }).join('');
+}
+
+function showDetail(id) {
+  var r = recipes.find(function(x){ return x.id == id; });
+  if (!r) return;
+  printingRecipe = r;
+  document.getElementById('detail-modal-title').textContent = r.name;
+  var photoUrl = convertDriveUrl(r.photo || '');
+  var html = '';
+  if (photoUrl) html += '<img src="' + photoUrl + '" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:14px" onerror="this.style.display=\'none\'">';
+  html += '<div style="display:flex;gap:8px;margin-bottom:14px">' + catBadge(r.cat) + '</div>';
+  html += '<div style="font-size:13px;font-weight:500;color:#666;margin-bottom:8px">재료 (1인분 기준)</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px">' + r.ings.map(function(i){ return '<span class="tag">' + i.name + ' ' + i.qty + i.unit + '</span>'; }).join('') + '</div>';
+  if (r.steps && r.steps.length) {
+    html += '<div style="font-size:13px;font-weight:500;color:#666;margin-bottom:8px">만드는 과정</div>';
+    html += r.steps.map(function(s, i){
+      return '<div class="step-row">' +
+        '<div class="step-num-badge">' + (i+1) + '</div>' +
+        '<div style="padding:6px 0;font-size:14px;line-height:1.6;flex:1">' + s + '</div></div>';
+    }).join('');
+  }
+  document.getElementById('detail-modal-content').innerHTML = html;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function printRecipe() {
+  if (!printingRecipe) return;
+  var r = printingRecipe;
+  var photoUrl = convertDriveUrl(r.photo || '');
+  var today = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\. /g,'. ');
+  var logoSrc = "data:image/png;base64,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";
+
+  var ingRows = r.ings.map(function(ing){
+    return '<li style="margin-bottom:5px">• <b>' + ing.name + ':</b> ' + ing.qty + ing.unit + '</li>';
+  }).join('');
+
+  var stepRows = r.steps && r.steps.length ? r.steps.map(function(s,i){
+    return '<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">' +
+      '<div style="min-width:26px;height:26px;border-radius:50%;background:#c8a97e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + (i+1) + '</div>' +
+      '<div style="font-size:13px;line-height:1.7;padding-top:3px"><b>' + s.split(':')[0] + (s.includes(':') ? ':</b>' + s.split(':').slice(1).join(':') : '</b>') + '</div></div>';
+  }).join('') : '<div style="font-size:13px;color:#aaa">제조 과정이 없습니다.</div>';
+
+  var photoHtml = photoUrl
+    ? '<img src="' + photoUrl + '" style="width:100%;height:180px;object-fit:cover;border-radius:6px;margin-bottom:12px">'
+    : '<div style="width:100%;height:180px;border:2px dashed #ddd;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:13px;margin-bottom:12px">제품 사진을 넣어주세요</div>';
+
+  var html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>${r.name} 레시피</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Noto Sans KR',sans-serif;background:#fff;color:#2c2c2c;padding:32px 36px;max-width:794px;margin:0 auto}
+  @media print{body{padding:20px 28px}button{display:none}}
+</style></head><body>
+
+<!-- 헤더 -->
+<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;padding-bottom:12px;border-bottom:2px solid #c8a97e">
+  <img src="${logoSrc}" style="height:60px;object-fit:contain">
+  <div style="text-align:right">
+    <div style="font-size:26px;font-weight:700;color:#2c2c2c;letter-spacing:-0.5px">${r.name}</div>
+    <div style="font-size:12px;color:#888;margin-top:4px">작성일: ${today} | 담당: 퍼스트바리스타제과제빵화성학원</div>
+  </div>
+</div>
+
+<!-- 본문 2단 레이아웃 -->
+<div style="display:flex;gap:20px;margin-top:20px">
+
+  <!-- 왼쪽 -->
+  <div style="width:220px;flex-shrink:0">
+    ${photoHtml}
+    <div style="background:#f9f6f1;border-radius:8px;padding:14px 16px">
+      <div style="font-size:14px;font-weight:700;color:#2c2c2c;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #e0d5c5">필수 재료</div>
+      <ul style="list-style:none;font-size:13px;line-height:1.8;color:#3a3a3a">${ingRows}</ul>
+    </div>
+  </div>
+
+  <!-- 오른쪽 -->
+  <div style="flex:1">
+    <div style="font-size:15px;font-weight:700;color:#2c2c2c;margin-bottom:14px;padding-bottom:6px;border-bottom:2px solid #e8e0d5">제조 공정</div>
+    ${stepRows}
+  </div>
+
+</div>
+
+<!-- 하단 -->
+<div style="margin-top:28px;padding-top:10px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#bbb">
+  본 레시피는 퍼스트바리스타제과제빵화성학원의 소중한 자산입니다. 무단 복제 및 배포를 금합니다.
+</div>
+
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  var w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+function printAllRecipes() {
+  var fc = document.getElementById('recipe-filter-cat').value;
+  var list = fc ? recipes.filter(function(r){ return r.cat === fc; }) : recipes;
+  if (!list.length) { showToast('레시피가 없습니다'); return; }
+  var today = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'});
+  var logoSrc = "data:image/png;base64,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";
+
+  var pages = list.map(function(r, idx) {
+    var photoUrl = convertDriveUrl(r.photo || '');
+    var photoHtml = photoUrl
+      ? '<img src="' + photoUrl + '" style="width:100%;height:180px;object-fit:cover;border-radius:6px;margin-bottom:12px">'
+      : '<div style="width:100%;height:180px;border:2px dashed #ddd;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:13px;margin-bottom:12px">제품 사진을 넣어주세요</div>';
+    var ingRows = r.ings.map(function(ing){ return '<li style="margin-bottom:5px">• <b>' + ing.name + ':</b> ' + ing.qty + ing.unit + '</li>'; }).join('');
+    var stepRows = r.steps && r.steps.length ? r.steps.map(function(s,i){
+      return '<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">' +
+        '<div style="min-width:26px;height:26px;border-radius:50%;background:#c8a97e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + (i+1) + '</div>' +
+        '<div style="font-size:13px;line-height:1.7;padding-top:3px">' + s + '</div></div>';
+    }).join('') : '<div style="font-size:13px;color:#aaa">제조 과정이 없습니다.</div>';
+    return '<div style="page-break-after:' + (idx < list.length-1 ? 'always' : 'auto') + ';padding:32px 36px;max-width:794px;margin:0 auto">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;padding-bottom:12px;border-bottom:2px solid #c8a97e">' +
+      '<img src="' + logoSrc + '" style="height:60px;object-fit:contain">' +
+      '<div style="text-align:right"><div style="font-size:26px;font-weight:700;color:#2c2c2c">' + r.name + '</div>' +
+      '<div style="font-size:12px;color:#888;margin-top:4px">작성일: ' + today + ' | 담당: 퍼스트바리스타제과제빵화성학원</div></div></div>' +
+      '<div style="display:flex;gap:20px;margin-top:20px">' +
+      '<div style="width:220px;flex-shrink:0">' + photoHtml +
+      '<div style="background:#f9f6f1;border-radius:8px;padding:14px 16px">' +
+      '<div style="font-size:14px;font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #e0d5c5">필수 재료</div>' +
+      '<ul style="list-style:none;font-size:13px;line-height:1.8">' + ingRows + '</ul></div></div>' +
+      '<div style="flex:1"><div style="font-size:15px;font-weight:700;margin-bottom:14px;padding-bottom:6px;border-bottom:2px solid #e8e0d5">제조 공정</div>' + stepRows + '</div></div>' +
+      '<div style="margin-top:28px;padding-top:10px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#bbb">본 레시피는 퍼스트바리스타제과제빵화성학원의 소중한 자산입니다. 무단 복제 및 배포를 금합니다.</div>' +
+      '</div>';
+  }).join('');
+
+  var w = window.open('', '_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>레시피 전체 인쇄</title><style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans KR',sans-serif;background:#fff;color:#2c2c2c}</style></head><body>' + pages + '<script>window.onload=function(){window.print();}<\/script></body></html>');
+  w.document.close();
+}
+
+function openRecipeModal(r) {
+  editingId = r ? r.id : null;
+  document.getElementById('modal-title').textContent = r ? '레시피 수정' : '레시피 등록';
+  document.getElementById('r-name').value = r ? r.name : '';
+  document.getElementById('r-cat').value = r ? r.cat : '제과기능사';
+  document.getElementById('r-photo').value = r ? (r.photo || '') : '';
+  document.getElementById('r-photo-preview').classList.remove('show');
+  if (r && r.photo) { document.getElementById('r-photo-preview').src = convertDriveUrl(r.photo); document.getElementById('r-photo-preview').classList.add('show'); }
+  tempIngs = r ? JSON.parse(JSON.stringify(r.ings)) : [{ name:'', qty:0, unit:'g' }];
+  tempSteps = r ? JSON.parse(JSON.stringify(r.steps || [])) : [''];
+  renderIngEditor();
+  renderStepEditor();
+  document.getElementById('recipe-modal').classList.add('open');
+}
+
+function closeRecipeModal() { document.getElementById('recipe-modal').classList.remove('open'); }
+
+function editRecipe(id) {
+  var r = recipes.find(function(x){ return x.id == id; });
+  if (r) openRecipeModal(r);
+}
+
+async function deleteRecipe(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  var res = await api('deleteRecipe', { id: id });
+  if (res && res.success) { showToast('삭제됐어요'); loadRecipes(); }
+}
+
+function renderIngEditor() {
+  document.getElementById('ing-editor').innerHTML = tempIngs.map(function(ing, i){
+    return '<div class="ing-row">' +
+      '<input type="text" value="' + ing.name + '" placeholder="재료명" oninput="tempIngs[' + i + '].name=this.value">' +
+      '<input type="number" value="' + ing.qty + '" min="0" step="0.1" style="text-align:center" oninput="tempIngs[' + i + '].qty=parseFloat(this.value)||0">' +
+      '<select onchange="tempIngs[' + i + '].unit=this.value">' +
+      ['g','ml','개','tbsp','tsp','L','kg'].map(function(u){ return '<option' + (u===ing.unit?' selected':'') + '>' + u + '</option>'; }).join('') + '</select>' +
+      '<button onclick="rmIng(' + i + ')" style="border:none;background:none;cursor:pointer;color:#aaa;font-size:16px">✕</button></div>';
+  }).join('');
+}
+
+function renderStepEditor() {
+  document.getElementById('step-editor').innerHTML = tempSteps.map(function(s, i){
+    return '<div class="step-row">' +
+      '<div class="step-num-badge">' + (i+1) + '</div>' +
+      '<textarea rows="2" style="flex:1;resize:vertical" placeholder="예: 버터를 중탕으로 녹인다" oninput="tempSteps[' + i + ']=this.value">' + s + '</textarea>' +
+      '<button onclick="rmStep(' + i + ')" style="border:none;background:none;cursor:pointer;color:#aaa;font-size:16px;margin-top:4px">✕</button>' +
+      '</div>';
+  }).join('');
+}
+
+function addIngRow() { tempIngs.push({ name:'', qty:0, unit:'g' }); renderIngEditor(); }
+function rmIng(i) { tempIngs.splice(i,1); renderIngEditor(); }
+function addStepRow() { tempSteps.push(''); renderStepEditor(); }
+function rmStep(i) { tempSteps.splice(i,1); renderStepEditor(); }
+
+async function saveRecipe() {
+  var name = document.getElementById('r-name').value.trim();
+  if (!name) { showToast('레시피명을 입력해 주세요'); return; }
+  var valid = tempIngs.filter(function(i){ return i.name.trim() && i.qty > 0; });
+  if (!valid.length) { showToast('재료를 1개 이상 입력해 주세요'); return; }
+  var validSteps = tempSteps.filter(function(s){ return s.trim(); });
+  var recipe = {
+    id: editingId || null,
+    name: name,
+    cat: document.getElementById('r-cat').value,
+    photo: document.getElementById('r-photo').value.trim(),
+    ings: valid,
+    steps: validSteps
+  };
+  var res = await api('saveRecipe', { recipe: recipe });
+  if (res && res.success) {
+    showToast(editingId ? '수정됐어요!' : '등록됐어요!');
+    closeRecipeModal(); loadRecipes();
+  }
+}
+
+// ── 발주 이력 ─────────────────────────────────────────
+function renderHistory(orders) {
+  var el = document.getElementById('history-list');
+  if (!orders || !orders.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📦</div>발주 이력이 없습니다</div>'; return;
+  }
+  el.innerHTML = orders.map(function(o) {
+    return '<div class="history-card">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+      '<div><div style="font-weight:600">' + o.date + '</div>' +
+      '<div style="font-size:12px;color:#888;margin-top:2px">' + o.classes + '</div></div>' +
+      '<button class="btn-sm btn-danger" onclick="deleteOrder(' + o.id + ')">삭제</button></div>' +
+      '<div>' + o.items.map(function(it){ return '<span class="tag">' + it.name + ' ' + it.qty + it.unit + '</span>'; }).join('') + '</div></div>';
+  }).join('');
+}
+
+async function deleteOrder(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  var res = await api('deleteOrder', { id: id });
+  if (res && res.success) { showToast('삭제됐어요'); loadHistory(); }
+}
+
+// ── 탭 전환 ───────────────────────────────────────────
+function switchTab(t) {
+  ['plan','recipe','history'].forEach(function(n, i) {
+    document.getElementById('tab-'+n).style.display = n===t ? 'block' : 'none';
+    document.querySelectorAll('.nav-btn')[i].classList.toggle('active', n===t);
+  });
+  if (t === 'history') loadHistory();
+}
+
+window.onload = function() { loadAll(); };
+</script>
+</body>
+</html>
