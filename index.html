@@ -67,7 +67,7 @@ button:active{transform:scale(.98)}
 .photo-preview{width:100%;max-height:200px;object-fit:cover;border-radius:8px;margin-bottom:8px;display:none}
 .photo-preview.show{display:block}
 .gdrive-tip{background:#e8f4fd;border:1px solid #b3d9f7;border-radius:8px;padding:10px 12px;font-size:12px;color:#1a5276;line-height:1.7;margin-bottom:10px}
-
+ 
 /* 프린트 스타일 */
 @media print {
   header, .nav, button, .modal-bg, .toast { display:none !important }
@@ -80,7 +80,7 @@ button:active{transform:scale(.98)}
   .print-show { display:block !important }
 }
 .print-show { display:none }
-
+ 
 @media print {
   #print-target { display:block !important }
 }
@@ -88,7 +88,7 @@ button:active{transform:scale(.98)}
 </style>
 </head>
 <body>
-
+ 
 <header>
   <div class="logo">베이킹 발주 <span>학원 공유</span></div>
   <nav class="nav">
@@ -97,9 +97,9 @@ button:active{transform:scale(.98)}
     <button class="nav-btn" onclick="switchTab('history')">발주이력</button>
   </nav>
 </header>
-
+ 
 <div class="main">
-
+ 
   <!-- 수업 계획 탭 -->
   <div id="tab-plan" style="display:block">
     <div class="stat-grid">
@@ -135,7 +135,7 @@ button:active{transform:scale(.98)}
       </div>
     </div>
   </div>
-
+ 
   <!-- 레시피 탭 -->
   <div id="tab-recipe" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -154,14 +154,14 @@ button:active{transform:scale(.98)}
     </div>
     <div id="recipe-list"></div>
   </div>
-
+ 
   <!-- 발주 이력 탭 -->
   <div id="tab-history" style="display:none">
     <div id="history-list"></div>
   </div>
-
+ 
 </div>
-
+ 
 <!-- 레시피 등록/수정 모달 -->
 <div class="modal-bg" id="recipe-modal">
   <div class="modal">
@@ -169,16 +169,16 @@ button:active{transform:scale(.98)}
       <div class="modal-title" id="modal-title">레시피 등록</div>
       <button class="close-btn" onclick="closeRecipeModal()">✕</button>
     </div>
-
+ 
     <label>레시피명</label>
     <input type="text" id="r-name" placeholder="예: 마들렌" style="margin-bottom:10px">
-
+ 
     <label>카테고리</label>
     <select id="r-cat" style="margin-bottom:12px">
       <option>제과기능사</option><option>제빵기능사</option><option>홈베이커리</option>
       <option>채식베이커리</option><option>디저트</option><option>기타</option>
     </select>
-
+ 
     <label>제품 사진 URL</label>
     <div class="gdrive-tip">
       📌 구글 드라이브 사용법:<br>
@@ -188,26 +188,31 @@ button:active{transform:scale(.98)}
     </div>
     <input type="text" id="r-photo" placeholder="https://drive.google.com/..." oninput="previewPhoto()" style="margin-bottom:8px">
     <img id="r-photo-preview" class="photo-preview" alt="사진 미리보기">
-
+ 
     <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px">
       <div style="font-size:13px;font-weight:500;color:#666">재료 (1인분 기준)</div>
       <button class="btn-sm" onclick="addIngRow()">+ 재료 추가</button>
     </div>
     <div id="ing-editor" style="margin-bottom:14px"></div>
-
+ 
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="flex:1"><label>윗불 온도 (°C)</label><input type="number" id="r-top-temp" placeholder="예: 180"></div>
+      <div style="flex:1"><label>아랫불 온도 (°C)</label><input type="number" id="r-bottom-temp" placeholder="예: 160"></div>
+      <div style="flex:1"><label>굽는 시간 (분)</label><input type="number" id="r-bake-time" placeholder="예: 25"></div>
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div style="font-size:13px;font-weight:500;color:#666">만드는 과정</div>
       <button class="btn-sm" onclick="addStepRow()">+ 단계 추가</button>
     </div>
     <div id="step-editor" style="margin-bottom:14px"></div>
-
+ 
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="closeRecipeModal()">취소</button>
       <button class="btn-primary" onclick="saveRecipe()">저장</button>
     </div>
   </div>
 </div>
-
+ 
 <!-- 레시피 상세/프린트 모달 -->
 <div class="modal-bg" id="detail-modal">
   <div class="modal" style="max-width:560px">
@@ -221,28 +226,28 @@ button:active{transform:scale(.98)}
     <div id="detail-modal-content"></div>
   </div>
 </div>
-
+ 
 <!-- 인쇄용 숨김 영역 -->
 <div id="print-target"></div>
-
+ 
 <div class="toast" id="toast"></div>
-
+ 
 <script>
 var API_URL = 'https://script.google.com/macros/s/AKfycbygIviI2Jpl3q6TYcjrwXpcCld6N_tHwoR33Dw3FTdr3ZeG9GyQnbM-qGq5gJzjI5fR/exec';
 var recipes = [], planItems = [], editingId = null, tempIngs = [], tempSteps = [];
 var printingRecipe = null;
 var CAT_CLS = {'제과기능사':'b-amber','제빵기능사':'b-teal','홈베이커리':'b-purple','채식베이커리':'b-green','디저트':'b-purple','기타':'b-teal'};
-
+ 
 function showToast(msg) {
   var t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
   setTimeout(function(){ t.classList.remove('show'); }, 2200);
 }
-
+ 
 function catBadge(cat) {
   return '<span class="badge ' + (CAT_CLS[cat]||'b-teal') + '">' + cat + '</span>';
 }
-
+ 
 // 구글 드라이브 URL → 직접 이미지 URL 변환
 function convertDriveUrl(url) {
   if (!url) return '';
@@ -250,14 +255,14 @@ function convertDriveUrl(url) {
   if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
   return url;
 }
-
+ 
 function previewPhoto() {
   var url = convertDriveUrl(document.getElementById('r-photo').value.trim());
   var img = document.getElementById('r-photo-preview');
   if (url) { img.src = url; img.classList.add('show'); }
   else { img.classList.remove('show'); }
 }
-
+ 
 async function api(action, body) {
   try {
     var opts = body
@@ -271,11 +276,11 @@ async function api(action, body) {
     return null;
   }
 }
-
+ 
 async function loadAll() {
   await Promise.all([loadRecipes(), loadHistory()]);
 }
-
+ 
 async function loadRecipes() {
   var data = await api('getRecipes');
   if (!data) return;
@@ -283,19 +288,19 @@ async function loadRecipes() {
   refreshRecipeSelect();
   renderRecipes();
 }
-
+ 
 async function loadHistory() {
   var data = await api('getOrders');
   if (!data) return;
   renderHistory(data.orders || []);
 }
-
+ 
 function refreshRecipeSelect() {
   var sel = document.getElementById('plan-recipe');
   sel.innerHTML = '<option value="">레시피 선택...</option>' +
     recipes.map(function(r){ return '<option value="' + r.id + '">' + r.name + ' (' + r.cat + ')</option>'; }).join('');
 }
-
+ 
 // ── 수업 계획 ──────────────────────────────────────────
 function addPlanItem() {
   var rid = document.getElementById('plan-recipe').value;
@@ -309,7 +314,7 @@ function addPlanItem() {
   document.getElementById('plan-count').value = 1;
   renderPlan();
 }
-
+ 
 function renderPlan() {
   var el = document.getElementById('plan-list');
   var rs = document.getElementById('result-section');
@@ -334,11 +339,11 @@ function renderPlan() {
   rs.style.display = 'block';
   calcResult();
 }
-
+ 
 function chgCount(i,d){ planItems[i].count = Math.max(1, planItems[i].count + d); renderPlan(); }
 function rmPlan(i){ planItems.splice(i,1); renderPlan(); }
 function clearPlan(){ if(!confirm('초기화하시겠습니까?'))return; planItems=[]; renderPlan(); }
-
+ 
 function calcResult() {
   var totals = {};
   planItems.forEach(function(p) {
@@ -366,13 +371,13 @@ function calcResult() {
   }).join('');
   updateStats(planItems.length, planItems.reduce(function(s,p){ return s+p.count; }, 0), entries.length);
 }
-
+ 
 function updateStats(c,s,i) {
   document.getElementById('s-cls').textContent = c;
   document.getElementById('s-stu').textContent = s;
   document.getElementById('s-ing').textContent = i;
 }
-
+ 
 function copyOrderText() {
   var totals = {};
   planItems.forEach(function(p) {
@@ -389,7 +394,7 @@ function copyOrderText() {
   Object.values(totals).forEach(function(e){ lines.push(e.name + ' ' + Math.round(e.total*10)/10 + e.unit); });
   navigator.clipboard.writeText(lines.join('\n')).then(function(){ showToast('클립보드에 복사됐어요!'); });
 }
-
+ 
 async function saveOrderFromPlan() {
   if (!planItems.length) { showToast('수업을 추가해 주세요'); return; }
   var totals = {};
@@ -413,7 +418,7 @@ async function saveOrderFromPlan() {
     planItems = []; renderPlan(); loadHistory();
   }
 }
-
+ 
 // ── 레시피 ────────────────────────────────────────────
 function renderRecipes() {
   var q = (document.getElementById('recipe-search').value || '').toLowerCase();
@@ -431,6 +436,14 @@ function renderRecipes() {
       ? '<img src="' + photoUrl + '" class="recipe-thumb" onerror="this.style.display=\'none\'">'
       : '<div class="recipe-thumb-placeholder">🍞</div>';
     var stepsCount = (r.steps || []).length;
+    var tempInfo = '';
+    if (r.topTemp || r.bottomTemp || r.bakeTime) {
+      tempInfo = '<div style="font-size:12px;color:#888;margin-top:4px">';
+      if (r.topTemp) tempInfo += '🔥 윗불 ' + r.topTemp + '°C';
+      if (r.bottomTemp) tempInfo += (r.topTemp ? ' / ' : '🔥 ') + '아랫불 ' + r.bottomTemp + '°C';
+      if (r.bakeTime) tempInfo += ' · ⏱ ' + r.bakeTime + '분';
+      tempInfo += '</div>';
+    }
     return '<div class="recipe-card">' +
       '<div class="recipe-card-body">' +
       '<div style="display:flex;gap:12px;align-items:flex-start">' +
@@ -442,12 +455,12 @@ function renderRecipes() {
       '<button class="btn-sm" onclick="showDetail(' + r.id + ')">📋 상세</button>' +
       '<button class="btn-sm" onclick="editRecipe(' + r.id + ')">수정</button>' +
       '<button class="btn-sm btn-danger" onclick="deleteRecipe(' + r.id + ')">삭제</button></div></div>' +
-      '<div style="font-size:12px;color:#888;margin-bottom:5px">재료 ' + r.ings.length + '가지' + (stepsCount ? ' · 과정 ' + stepsCount + '단계' : '') + '</div>' +
+      '<div style="font-size:12px;color:#888;margin-bottom:5px">재료 ' + r.ings.length + '가지' + (stepsCount ? ' · 과정 ' + stepsCount + '단계' : '') + '</div>' + tempInfo +
       '<div>' + r.ings.map(function(i){ return '<span class="tag">' + i.name + ' ' + i.qty + i.unit + '</span>'; }).join('') + '</div>' +
       '</div></div></div></div>';
   }).join('');
 }
-
+ 
 function showDetail(id) {
   var r = recipes.find(function(x){ return x.id == id; });
   if (!r) return;
@@ -456,7 +469,14 @@ function showDetail(id) {
   var photoUrl = convertDriveUrl(r.photo || '');
   var html = '';
   if (photoUrl) html += '<img src="' + photoUrl + '" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:14px" onerror="this.style.display=\'none\'">';
-  html += '<div style="display:flex;gap:8px;margin-bottom:14px">' + catBadge(r.cat) + '</div>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:8px">' + catBadge(r.cat) + '</div>';
+  if (r.topTemp || r.bottomTemp || r.bakeTime) {
+    html += '<div style="background:#fff8f0;border:1px solid #f0d8b0;border-radius:8px;padding:8px 14px;font-size:13px;margin-bottom:14px;display:flex;gap:16px">';
+    if (r.topTemp) html += '<span>🔥 윗불 <b>' + r.topTemp + '°C</b></span>';
+    if (r.bottomTemp) html += '<span>🔥 아랫불 <b>' + r.bottomTemp + '°C</b></span>';
+    if (r.bakeTime) html += '<span>⏱ 굽는 시간 <b>' + r.bakeTime + '분</b></span>';
+    html += '</div>';
+  }
   html += '<div style="font-size:13px;font-weight:500;color:#666;margin-bottom:8px">재료 (1인분 기준)</div>';
   html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px">' + r.ings.map(function(i){ return '<span class="tag">' + i.name + ' ' + i.qty + i.unit + '</span>'; }).join('') + '</div>';
   if (r.steps && r.steps.length) {
@@ -470,7 +490,7 @@ function showDetail(id) {
   document.getElementById('detail-modal-content').innerHTML = html;
   document.getElementById('detail-modal').classList.add('open');
 }
-
+ 
 function printRecipe() {
   if (!printingRecipe) return;
   var r = printingRecipe;
@@ -494,6 +514,13 @@ function printRecipe() {
   html += '<img src="' + logoSrc + '" style="height:60px;object-fit:contain">';
   html += '<div style="text-align:right"><div style="font-size:26px;font-weight:700;color:#2c2c2c">' + r.name + '</div>';
   html += '<div style="font-size:12px;color:#888;margin-top:4px">작성일: ' + today + ' | 담당: 퍼스트바리스타제과제빵화성학원</div></div></div>';
+  if (r.topTemp || r.bottomTemp || r.bakeTime) {
+    html += '<div style="background:#fff8f0;border:1px solid #f0d8b0;border-radius:8px;padding:8px 14px;font-size:13px;margin-top:10px;display:flex;gap:20px">';
+    if (r.topTemp) html += '<span>🔥 윗불 <b>' + r.topTemp + '°C</b></span>';
+    if (r.bottomTemp) html += '<span>🔥 아랫불 <b>' + r.bottomTemp + '°C</b></span>';
+    if (r.bakeTime) html += '<span>⏱ 굽는 시간 <b>' + r.bakeTime + '분</b></span>';
+    html += '</div>';
+  }
   html += '<div style="display:flex;gap:20px;margin-top:20px">';
   html += '<div style="width:220px;flex-shrink:0">' + photoHtml;
   html += '<div style="background:#f9f6f1;border-radius:8px;padding:14px 16px">';
@@ -528,6 +555,12 @@ function printAllRecipes() {
       '<img src="' + logoSrc + '" style="height:60px;object-fit:contain">' +
       '<div style="text-align:right"><div style="font-size:26px;font-weight:700;color:#2c2c2c">' + r.name + '</div>' +
       '<div style="font-size:12px;color:#888;margin-top:4px">작성일: ' + today + ' | 담당: 퍼스트바리스타제과제빵화성학원</div></div></div>' +
+      (r.topTemp || r.bottomTemp || r.bakeTime ?
+        '<div style="background:#fff8f0;border:1px solid #f0d8b0;border-radius:8px;padding:8px 14px;font-size:13px;margin-top:10px;display:flex;gap:20px">' +
+        (r.topTemp ? '<span>🔥 윗불 <b>' + r.topTemp + '°C</b></span>' : '') +
+        (r.bottomTemp ? '<span>🔥 아랫불 <b>' + r.bottomTemp + '°C</b></span>' : '') +
+        (r.bakeTime ? '<span>⏱ 굽는 시간 <b>' + r.bakeTime + '분</b></span>' : '') +
+        '</div>' : '') +
       '<div style="display:flex;gap:20px;margin-top:20px">' +
       '<div style="width:220px;flex-shrink:0">' + photoHtml +
       '<div style="background:#f9f6f1;border-radius:8px;padding:14px 16px">' +
@@ -551,6 +584,9 @@ function openRecipeModal(r) {
   document.getElementById('r-name').value = r ? r.name : '';
   document.getElementById('r-cat').value = r ? r.cat : '제과기능사';
   document.getElementById('r-photo').value = r ? (r.photo || '') : '';
+  document.getElementById('r-top-temp').value = r ? (r.topTemp || '') : '';
+  document.getElementById('r-bottom-temp').value = r ? (r.bottomTemp || '') : '';
+  document.getElementById('r-bake-time').value = r ? (r.bakeTime || '') : '';
   document.getElementById('r-photo-preview').classList.remove('show');
   if (r && r.photo) { document.getElementById('r-photo-preview').src = convertDriveUrl(r.photo); document.getElementById('r-photo-preview').classList.add('show'); }
   tempIngs = r ? JSON.parse(JSON.stringify(r.ings)) : [{ name:'', qty:0, unit:'g' }];
@@ -559,20 +595,20 @@ function openRecipeModal(r) {
   renderStepEditor();
   document.getElementById('recipe-modal').classList.add('open');
 }
-
+ 
 function closeRecipeModal() { document.getElementById('recipe-modal').classList.remove('open'); }
-
+ 
 function editRecipe(id) {
   var r = recipes.find(function(x){ return x.id == id; });
   if (r) openRecipeModal(r);
 }
-
+ 
 async function deleteRecipe(id) {
   if (!confirm('삭제하시겠습니까?')) return;
   var res = await api('deleteRecipe', { id: id });
   if (res && res.success) { showToast('삭제됐어요'); loadRecipes(); }
 }
-
+ 
 function renderIngEditor() {
   document.getElementById('ing-editor').innerHTML = tempIngs.map(function(ing, i){
     return '<div class="ing-row">' +
@@ -583,7 +619,7 @@ function renderIngEditor() {
       '<button onclick="rmIng(' + i + ')" style="border:none;background:none;cursor:pointer;color:#aaa;font-size:16px">✕</button></div>';
   }).join('');
 }
-
+ 
 function renderStepEditor() {
   document.getElementById('step-editor').innerHTML = tempSteps.map(function(s, i){
     return '<div class="step-row">' +
@@ -593,12 +629,12 @@ function renderStepEditor() {
       '</div>';
   }).join('');
 }
-
+ 
 function addIngRow() { tempIngs.push({ name:'', qty:0, unit:'g' }); renderIngEditor(); }
 function rmIng(i) { tempIngs.splice(i,1); renderIngEditor(); }
 function addStepRow() { tempSteps.push(''); renderStepEditor(); }
 function rmStep(i) { tempSteps.splice(i,1); renderStepEditor(); }
-
+ 
 async function saveRecipe() {
   var name = document.getElementById('r-name').value.trim();
   if (!name) { showToast('레시피명을 입력해 주세요'); return; }
@@ -610,6 +646,9 @@ async function saveRecipe() {
     name: name,
     cat: document.getElementById('r-cat').value,
     photo: document.getElementById('r-photo').value.trim(),
+    topTemp: document.getElementById('r-top-temp').value || '',
+    bottomTemp: document.getElementById('r-bottom-temp').value || '',
+    bakeTime: document.getElementById('r-bake-time').value || '',
     ings: valid,
     steps: validSteps
   };
@@ -619,7 +658,7 @@ async function saveRecipe() {
     closeRecipeModal(); loadRecipes();
   }
 }
-
+ 
 // ── 발주 이력 ─────────────────────────────────────────
 function renderHistory(orders) {
   var el = document.getElementById('history-list');
@@ -635,13 +674,13 @@ function renderHistory(orders) {
       '<div>' + o.items.map(function(it){ return '<span class="tag">' + it.name + ' ' + it.qty + it.unit + '</span>'; }).join('') + '</div></div>';
   }).join('');
 }
-
+ 
 async function deleteOrder(id) {
   if (!confirm('삭제하시겠습니까?')) return;
   var res = await api('deleteOrder', { id: id });
   if (res && res.success) { showToast('삭제됐어요'); loadHistory(); }
 }
-
+ 
 // ── 탭 전환 ───────────────────────────────────────────
 function switchTab(t) {
   ['plan','recipe','history'].forEach(function(n, i) {
@@ -650,7 +689,7 @@ function switchTab(t) {
   });
   if (t === 'history') loadHistory();
 }
-
+ 
 window.onload = function() { loadAll(); };
 </script>
 </body>
