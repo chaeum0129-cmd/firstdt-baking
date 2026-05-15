@@ -475,81 +475,43 @@ function printRecipe() {
   if (!printingRecipe) return;
   var r = printingRecipe;
   var photoUrl = convertDriveUrl(r.photo || '');
-  var today = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\. /g,'. ');
+  var today = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'});
   var logoSrc = "data:image/png;base64,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";
-
-  var ingRows = r.ings.map(function(ing){
-    return '<li style="margin-bottom:5px">• <b>' + ing.name + ':</b> ' + ing.qty + ing.unit + '</li>';
-  }).join('');
-
-  var stepRows = r.steps && r.steps.length ? r.steps.map(function(s,i){
-    return '<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">' +
-      '<div style="min-width:26px;height:26px;border-radius:50%;background:#c8a97e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + (i+1) + '</div>' +
-      '<div style="font-size:13px;line-height:1.7;padding-top:3px"><b>' + s.split(':')[0] + (s.includes(':') ? ':</b>' + s.split(':').slice(1).join(':') : '</b>') + '</div></div>';
-  }).join('') : '<div style="font-size:13px;color:#aaa">제조 과정이 없습니다.</div>';
-
   var photoHtml = photoUrl
     ? '<img src="' + photoUrl + '" style="width:100%;height:180px;object-fit:cover;border-radius:6px;margin-bottom:12px">'
     : '<div style="width:100%;height:180px;border:2px dashed #ddd;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:13px;margin-bottom:12px">제품 사진을 넣어주세요</div>';
-
-  var html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>${r.name} 레시피</title>
-<style>
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Noto Sans KR',sans-serif;background:#fff;color:#2c2c2c;padding:32px 36px;max-width:794px;margin:0 auto}
-  @media print{body{padding:20px 28px}button{display:none}}
-</style></head><body>
-
-<!-- 헤더 -->
-<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;padding-bottom:12px;border-bottom:2px solid #c8a97e">
-  <img src="${logoSrc}" style="height:60px;object-fit:contain">
-  <div style="text-align:right">
-    <div style="font-size:26px;font-weight:700;color:#2c2c2c;letter-spacing:-0.5px">${r.name}</div>
-    <div style="font-size:12px;color:#888;margin-top:4px">작성일: ${today} | 담당: 퍼스트바리스타제과제빵화성학원</div>
-  </div>
-</div>
-
-<!-- 본문 2단 레이아웃 -->
-<div style="display:flex;gap:20px;margin-top:20px">
-
-  <!-- 왼쪽 -->
-  <div style="width:220px;flex-shrink:0">
-    ${photoHtml}
-    <div style="background:#f9f6f1;border-radius:8px;padding:14px 16px">
-      <div style="font-size:14px;font-weight:700;color:#2c2c2c;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #e0d5c5">필수 재료</div>
-      <ul style="list-style:none;font-size:13px;line-height:1.8;color:#3a3a3a">${ingRows}</ul>
-    </div>
-  </div>
-
-  <!-- 오른쪽 -->
-  <div style="flex:1">
-    <div style="font-size:15px;font-weight:700;color:#2c2c2c;margin-bottom:14px;padding-bottom:6px;border-bottom:2px solid #e8e0d5">제조 공정</div>
-    ${stepRows}
-  </div>
-
-</div>
-
-<!-- 하단 -->
-<div style="margin-top:28px;padding-top:10px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#bbb">
-  본 레시피는 퍼스트바리스타제과제빵화성학원의 소중한 자산입니다. 무단 복제 및 배포를 금합니다.
-</div>
-
-<script>window.onload=function(){window.print();}<\/script>
-</body></html>`;
-
+  var ingRows = r.ings.map(function(ing){ return '<li style="margin-bottom:5px">• <b>' + ing.name + ':</b> ' + ing.qty + ing.unit + '</li>'; }).join('');
+  var stepRows = r.steps && r.steps.length ? r.steps.map(function(s,i){
+    return '<div style="display:flex;gap:12px;align-items:flex-start;margin-bottom:12px">' +
+      '<div style="min-width:26px;height:26px;border-radius:50%;background:#c8a97e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + (i+1) + '</div>' +
+      '<div style="font-size:13px;line-height:1.7;padding-top:3px">' + s + '</div></div>';
+  }).join('') : '<div style="font-size:13px;color:#aaa">제조 과정이 없습니다.</div>';
   var w = window.open('', '_blank');
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>' + r.name + ' 레시피</title>';
+  html += '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:sans-serif;background:#fff;color:#2c2c2c;padding:32px 36px;max-width:794px;margin:0 auto}</style>';
+  html += '</head><body>';
+  html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;padding-bottom:12px;border-bottom:2px solid #c8a97e">';
+  html += '<img src="' + logoSrc + '" style="height:60px;object-fit:contain">';
+  html += '<div style="text-align:right"><div style="font-size:26px;font-weight:700;color:#2c2c2c">' + r.name + '</div>';
+  html += '<div style="font-size:12px;color:#888;margin-top:4px">작성일: ' + today + ' | 담당: 퍼스트바리스타제과제빵화성학원</div></div></div>';
+  html += '<div style="display:flex;gap:20px;margin-top:20px">';
+  html += '<div style="width:220px;flex-shrink:0">' + photoHtml;
+  html += '<div style="background:#f9f6f1;border-radius:8px;padding:14px 16px">';
+  html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #e0d5c5">필수 재료</div>';
+  html += '<ul style="list-style:none;font-size:13px;line-height:1.8">' + ingRows + '</ul></div></div>';
+  html += '<div style="flex:1"><div style="font-size:15px;font-weight:700;margin-bottom:14px;padding-bottom:6px;border-bottom:2px solid #e8e0d5">제조 공정</div>' + stepRows + '</div></div>';
+  html += '<div style="margin-top:28px;padding-top:10px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#bbb">본 레시피는 퍼스트바리스타제과제빵화성학원의 소중한 자산입니다. 무단 복제 및 배포를 금합니다.</div>';
+  html += '</body></html>';
   w.document.write(html);
   w.document.close();
+  setTimeout(function(){ w.print(); }, 800);
 }
-
 function printAllRecipes() {
   var fc = document.getElementById('recipe-filter-cat').value;
   var list = fc ? recipes.filter(function(r){ return r.cat === fc; }) : recipes;
   if (!list.length) { showToast('레시피가 없습니다'); return; }
   var today = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'});
   var logoSrc = "data:image/png;base64,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";
-
   var pages = list.map(function(r, idx) {
     var photoUrl = convertDriveUrl(r.photo || '');
     var photoHtml = photoUrl
@@ -575,12 +537,14 @@ function printAllRecipes() {
       '<div style="margin-top:28px;padding-top:10px;border-top:1px solid #e8e0d5;text-align:center;font-size:11px;color:#bbb">본 레시피는 퍼스트바리스타제과제빵화성학원의 소중한 자산입니다. 무단 복제 및 배포를 금합니다.</div>' +
       '</div>';
   }).join('');
-
   var w = window.open('', '_blank');
-  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>레시피 전체 인쇄</title><style>@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Noto Sans KR',sans-serif;background:#fff;color:#2c2c2c}</style></head><body>' + pages + '<script>window.onload=function(){window.print();}<\/script></body></html>');
+  var fullHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>레시피 전체 인쇄</title>';
+  fullHtml += '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:sans-serif;background:#fff;color:#2c2c2c}</style>';
+  fullHtml += '</head><body>' + pages + '</body></html>';
+  w.document.write(fullHtml);
   w.document.close();
+  setTimeout(function(){ w.print(); }, 800);
 }
-
 function openRecipeModal(r) {
   editingId = r ? r.id : null;
   document.getElementById('modal-title').textContent = r ? '레시피 수정' : '레시피 등록';
