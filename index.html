@@ -384,8 +384,8 @@ function renderRecipes(){
   var fc=document.getElementById('recipe-filter-cat').value;
   var list=recipes.filter(function(r){return(!q||r.name.toLowerCase().includes(q))&&(!fc||r.cat===fc);});
   var el=document.getElementById('recipe-list');
-  if(!list.length){el.innerHTML='<div class="empty"><div style="font-size:32px;margin-bottom:8px">📖</div>레시피가 없습니다</div>';return;}
-  el.innerHTML=list.map(function(r){
+  if(!list.length){el.innerHTML='<div class="empty" style="text-align:center;color:#aaa;padding:3rem 0"><div style="font-size:32px;margin-bottom:8px">📖</div>레시피가 없습니다</div>';return;}
+  el.innerHTML=list.map(function(r,ridx){
     var photoUrl=convertDriveUrl(r.photo||'');
     var photoEl=photoUrl?('<img src="'+photoUrl+'" class="recipe-thumb">'):'<div class="recipe-thumb-placeholder">🍞</div>';
     var totalIngs=getAllIngs(r).length;
@@ -394,26 +394,40 @@ function renderRecipes(){
     else if(r.steps){totalSteps=r.steps.length;}
     var tempStr='';
     if(r.topTemp||r.bottomTemp||r.bakeTime){
-      tempStr='<div style="font-size:12px;color:#888;margin-top:3px">';
-      if(r.topTemp)tempStr+='🔥 윗불 '+r.topTemp+'°C';
-      if(r.bottomTemp)tempStr+=(r.topTemp?' / ':'🔥 ')+'아랫불 '+r.bottomTemp+'°C';
-      if(r.bakeTime)tempStr+=' · ⏱ '+r.bakeTime+'분';
-      tempStr+='</div>';
+      var parts=[];
+      if(r.topTemp)parts.push('윗불 '+r.topTemp+'°C');
+      if(r.bottomTemp)parts.push('아랫불 '+r.bottomTemp+'°C');
+      if(r.bakeTime)parts.push(r.bakeTime+'분');
+      tempStr='<div style="font-size:12px;color:#888;margin-top:3px">🔥 '+parts.join(' / ')+'</div>';
     }
-    return '<div class="recipe-card"><div class="recipe-card-body"><div style="display:flex;gap:12px;align-items:flex-start">'+photoEl+
-      '<div style="flex:1"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">'+
-      '<div><span style="font-weight:600;font-size:15px">'+r.name+'</span> '+catBadge(r.cat)+'</div>'+
-      '<div style="display:flex;gap:5px"><button class="btn-sm" onclick="showDetail(''+r.id+'')">📋 상세</button>'+
-      '<button class="btn-sm" onclick="editRecipe(''+r.id+'')">수정</button>'+
-      '<button class="btn-sm btn-danger" onclick="deleteRecipe(''+r.id+'')">삭제</button></div></div>'+
-      '<div style="font-size:12px;color:#888;margin-bottom:3px">재료 '+totalIngs+'가지'+(totalSteps?' · 과정 '+totalSteps+'단계':'')+'</div>'+
-      tempStr+'</div></div></div></div>';
+    var html='<div class="recipe-card"><div class="recipe-card-body">';
+    html+='<div style="display:flex;gap:12px;align-items:flex-start">';
+    html+=photoEl;
+    html+='<div style="flex:1">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">';
+    html+='<div><span style="font-weight:600;font-size:15px">'+r.name+'</span> '+catBadge(r.cat)+'</div>';
+    html+='<div style="display:flex;gap:5px">';
+    html+='<button class="btn-sm" onclick="showDetailByIdx('+ridx+')">📋 상세</button>';
+    html+='<button class="btn-sm" onclick="editRecipeByIdx('+ridx+')">수정</button>';
+    html+='<button class="btn-sm btn-danger" onclick="deleteRecipeByIdx('+ridx+')">삭제</button>';
+    html+='</div></div>';
+    html+='<div style="font-size:12px;color:#888;margin-bottom:3px">재료 '+totalIngs+'가지'+(totalSteps?' · 과정 '+totalSteps+'단계':'')+'</div>';
+    html+=tempStr;
+    html+='</div></div></div></div>';
+    return html;
   }).join('');
 }
-
 // ── 상세보기 ──
-function showDetail(id){
-  var r=recipes.find(function(x){return String(x.id)===String(id);});
+function getFilteredList(){
+  var q=(document.getElementById('recipe-search').value||'').toLowerCase();
+  var fc=document.getElementById('recipe-filter-cat').value;
+  return recipes.filter(function(r){return(!q||r.name.toLowerCase().includes(q))&&(!fc||r.cat===fc);});
+}
+function showDetailByIdx(i){var l=getFilteredList();if(l[i])showDetail(l[i]);}
+function editRecipeByIdx(i){var l=getFilteredList();if(l[i])openRecipeModal(l[i]);}
+function deleteRecipeByIdx(i){var l=getFilteredList();if(l[i])deleteRecipe(l[i].id);}
+
+function showDetail(r){
   if(!r)return;
   printingRecipe=r;
   document.getElementById('detail-title').textContent=r.name;
@@ -518,8 +532,7 @@ function printAllRecipes(){
 }
 
 // ── 레시피 등록/수정 ──
-function openRecipeModal(id){
-  var r=id?recipes.find(function(x){return String(x.id)===String(id);}):null;
+function openRecipeModal(r){
   editingId=r?r.id:null;
   document.getElementById('modal-title').textContent=r?'레시피 수정':'레시피 등록';
   document.getElementById('r-name').value=r?r.name:'';
@@ -541,7 +554,7 @@ function openRecipeModal(id){
   document.getElementById('recipe-modal').classList.add('open');
 }
 
-function editRecipe(id){openRecipeModal(id);}
+
 function closeRecipeModal(){document.getElementById('recipe-modal').classList.remove('open');}
 
 async function deleteRecipe(id){
@@ -562,16 +575,21 @@ async function saveRecipe(){
 
 // ── 발주 이력 ──
 function renderHistory(orders){
+  window._orders=orders;
   var el=document.getElementById('history-list');
-  if(!orders||!orders.length){el.innerHTML='<div class="empty"><div style="font-size:32px;margin-bottom:8px">📦</div>발주 이력이 없습니다</div>';return;}
-  el.innerHTML=orders.map(function(o){
-    return '<div class="history-card"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
-      '<div><div style="font-weight:600">'+o.date+'</div><div style="font-size:12px;color:#888;margin-top:2px">'+o.classes+'</div></div>'+
-      '<button class="btn-sm btn-danger" onclick="deleteOrder(''+o.id+'')">삭제</button></div>'+
-      '<div>'+o.items.map(function(it){return '<span class="tag">'+it.name+' '+it.qty+it.unit+'</span>';}).join('')+'</div></div>';
+  if(!orders||!orders.length){el.innerHTML='<div class="empty" style="text-align:center;color:#aaa;padding:3rem 0"><div style="font-size:32px;margin-bottom:8px">📦</div>발주 이력이 없습니다</div>';return;}
+  el.innerHTML=orders.map(function(o,oidx){
+    var html='<div class="history-card">';
+    html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">';
+    html+='<div><div style="font-weight:600">'+o.date+'</div><div style="font-size:12px;color:#888;margin-top:2px">'+o.classes+'</div></div>';
+    html+='<button class="btn-sm btn-danger" onclick="deleteOrderByIdx('+oidx+')">삭제</button>';
+    html+='</div>';
+    html+='<div>'+o.items.map(function(it){return '<span class="tag">'+it.name+' '+it.qty+it.unit+'</span>';}).join('')+'</div>';
+    html+='</div>';
+    return html;
   }).join('');
 }
-
+function deleteOrderByIdx(i){if(window._orders&&window._orders[i])deleteOrder(window._orders[i].id);}
 async function deleteOrder(id){
   if(!confirm('삭제하시겠습니까?'))return;
   var res=await api('deleteOrder',{id:id});
