@@ -362,7 +362,7 @@ function renderBakeStepEditor(){
       '<div class="bake-step-body">'+
       '<div style="flex:1"><label>윗불 (°C)</label><input type="number" value="'+s.topTemp+'" placeholder="예: 200" oninput="tempBakeSteps['+i+'].topTemp=this.value"></div>'+
       '<div style="flex:1"><label>아랫불 (°C)</label><input type="number" value="'+s.bottomTemp+'" placeholder="예: 190" oninput="tempBakeSteps['+i+'].bottomTemp=this.value"></div>'+
-      '<div style="flex:1"><label>시간 (분)</label><input type="number" value="'+s.bakeTime+'" placeholder="예: 15" oninput="tempBakeSteps['+i+'].bakeTime=this.value"></div>'+
+      '<div style="flex:1"><label>시간 (분)</label><input type="text" value="'+s.bakeTime+'" placeholder="예: 15 또는 20~30" oninput="tempBakeSteps['+i+'].bakeTime=this.value"></div>'+
       '</div></div>';
   }).join('');
 }
@@ -502,11 +502,11 @@ function showDetail(r){
   if(r.ingGroups&&r.ingGroups.length){
     r.ingGroups.forEach(function(g){
       html+='<div style="font-size:13px;font-weight:600;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid #e5e4e0">📦 '+g.groupName+' 재료</div>';
-      html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'+(g.ings||[]).map(function(i){return '<span class="tag">'+i.name+' '+i.qty+i.unit+'</span>';}).join('')+'</div>';
+      html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px">'+(g.ings||[]).map(function(i){var noUnit=['소량','약간','적당량'];var qtyStr=noUnit.indexOf(i.unit)>=0?i.unit:(i.qty+i.unit);return '<span class="tag">'+i.name+' '+qtyStr+'</span>';}).join('')+'</div>';
     });
   } else if(r.ings&&r.ings.length){
     html+='<div style="font-size:13px;font-weight:500;color:#666;margin-bottom:6px">재료</div>';
-    html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">'+r.ings.map(function(i){return '<span class="tag">'+i.name+' '+i.qty+i.unit+'</span>';}).join('')+'</div>';
+    html+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">'+r.ings.map(function(i){var noUnit=['소량','약간','적당량'];var qtyStr=noUnit.indexOf(i.unit)>=0?i.unit:(i.qty+i.unit);return '<span class="tag">'+i.name+' '+qtyStr+'</span>';}).join('')+'</div>';
   }
   if(r.stepGroups&&r.stepGroups.length){
     var n=0;
@@ -531,12 +531,12 @@ function buildPage(r){
     r.ingGroups.forEach(function(g){
       ingHtml+='<div style="font-size:11px;font-weight:700;margin:8px 0 4px;color:#633806;border-bottom:1px solid #e0d5c5;padding-bottom:2px">'+g.groupName+'</div>';
       ingHtml+='<ul style="list-style:none;font-size:12px;line-height:1.8">';
-      (g.ings||[]).forEach(function(i){ingHtml+='<li>• <b>'+i.name+':</b> '+i.qty+i.unit+'</li>';});
+      (g.ings||[]).forEach(function(i){var noUnit=['소량','약간','적당량'];var qtyStr=noUnit.indexOf(i.unit)>=0?i.unit:(i.qty+i.unit);ingHtml+='<li>• <b>'+i.name+':</b> '+qtyStr+'</li>';});
       ingHtml+='</ul>';
     });
   } else {
     ingHtml='<ul style="list-style:none;font-size:12px;line-height:1.8">';
-    (r.ings||[]).forEach(function(i){ingHtml+='<li>• <b>'+i.name+':</b> '+i.qty+i.unit+'</li>';});
+    (r.ings||[]).forEach(function(i){var noUnit=['소량','약간','적당량'];var qtyStr=noUnit.indexOf(i.unit)>=0?i.unit:(i.qty+i.unit);ingHtml+='<li>• <b>'+i.name+':</b> '+qtyStr+'</li>';});
     ingHtml+='</ul>';
   }
   var stepHtml='',n=0;
