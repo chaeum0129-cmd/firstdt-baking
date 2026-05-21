@@ -68,6 +68,10 @@ button:active{transform:scale(.98)}
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:.3s;pointer-events:none}
 .toast.show{opacity:1}
 .gdrive-tip{background:#e8f4fd;border:1px solid #b3d9f7;border-radius:8px;padding:10px 12px;font-size:12px;color:#1a5276;line-height:1.7;margin-bottom:8px}
+.plan-picker-item{padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0efeb;display:flex;justify-content:space-between;align-items:center;transition:.1s}
+.plan-picker-item:last-child{border-bottom:none}
+.plan-picker-item:hover{background:#f5f4f0}
+.plan-picker-item.selected{background:#f5f4f0;font-weight:500}
 .temp-box{background:#fff8f0;border:1px solid #f0d8b0;border-radius:8px;padding:8px 14px;font-size:13px;margin-bottom:14px;display:flex;gap:16px;flex-wrap:wrap}
 .bake-step{border:1px solid #e5e4e0;border-radius:10px;margin-bottom:8px;overflow:hidden}
 .bake-step-header{background:#fff8f0;padding:7px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #f0d8b0;font-size:12px;font-weight:600;color:#633806}
@@ -92,9 +96,24 @@ button:active{transform:scale(.98)}
     </div>
     <div class="card">
       <div style="font-size:13px;font-weight:500;color:#666;margin-bottom:10px">수업 추가</div>
-      <div class="row">
-        <div class="flex-2"><label>레시피</label><select id="plan-recipe"><option value="">선택...</option></select></div>
-        <div class="flex-1"><label>인원(명)</label><input type="number" id="plan-count" value="1" min="1" style="text-align:center"></div>
+      <div class="row" style="margin-bottom:8px">
+        <div style="flex:1">
+          <label>카테고리</label>
+          <select id="plan-cat-filter" onchange="renderPlanPicker()">
+            <option value="">전체</option>
+            <option>제과기능사</option><option>제빵기능사</option><option>홈베이커리</option>
+            <option>채식베이커리</option><option>디저트</option><option>기타</option>
+          </select>
+        </div>
+        <div style="flex:2">
+          <label>레시피 검색</label>
+          <input type="text" id="plan-search" placeholder="레시피명 검색..." oninput="renderPlanPicker()">
+        </div>
+      </div>
+      <div id="plan-picker-list" style="max-height:180px;overflow-y:auto;border:1px solid #e5e4e0;border-radius:8px;margin-bottom:8px"></div>
+      <div class="row" style="margin-bottom:0">
+        <div style="flex:1;font-size:13px;color:#666" id="plan-selected-name">레시피를 선택하세요</div>
+        <div style="flex-shrink:0"><label>인원(명)</label><input type="number" id="plan-count" value="1" min="1" style="text-align:center;width:70px"></div>
         <button class="btn-primary" onclick="addPlanItem()" style="white-space:nowrap;margin-bottom:1px">+ 추가</button>
       </div>
     </div>
@@ -220,8 +239,7 @@ async function loadRecipes(){
   var data=await api('getRecipes');
   if(!data)return;
   recipes=data.recipes||[];
-  var sel=document.getElementById('plan-recipe');
-  sel.innerHTML='<option value="">레시피 선택...</option>'+recipes.map(function(r){return '<option value="'+r.id+'">'+r.name+' ('+r.cat+')</option>';}).join('');
+  renderPlanPicker();
   renderRecipes();
 }
 
@@ -238,8 +256,35 @@ function getAllIngs(r){
   return all;
 }
 
+function renderPlanPicker(){
+  var q=(document.getElementById('plan-search').value||'').toLowerCase();
+  var fc=document.getElementById('plan-cat-filter').value;
+  var filtered=recipes.filter(function(r){
+    return(!q||r.name.toLowerCase().includes(q))&&(!fc||r.cat===fc);
+  });
+  var el=document.getElementById('plan-picker-list');
+  if(!filtered.length){
+    el.innerHTML='<div style="padding:12px;text-align:center;font-size:13px;color:#aaa">검색 결과가 없습니다</div>';return;
+  }
+  el.innerHTML=filtered.map(function(r){
+    var sel=window._planSelectedId&&String(window._planSelectedId)===String(r.id);
+    return '<div class="plan-picker-item'+(sel?' selected':'')+'" onclick="selectPlanRecipe(''+r.id+'',''+r.name+'')">'+
+      '<span>'+r.name+'</span>'+
+      '<span class="badge '+(CAT_CLS[r.cat]||'b-teal')+'" style="font-size:10px">'+r.cat+'</span>'+
+      '</div>';
+  }).join('');
+}
+
+function selectPlanRecipe(id,name){
+  window._planSelectedId=id;
+  document.getElementById('plan-selected-name').textContent='선택: '+name;
+  document.getElementById('plan-selected-name').style.fontWeight='500';
+  document.getElementById('plan-selected-name').style.color='#1a1a18';
+  renderPlanPicker();
+}
+
 function addPlanItem(){
-  var rid=document.getElementById('plan-recipe').value;
+  var rid=window._planSelectedId||'';
   var cnt=parseInt(document.getElementById('plan-count').value)||1;
   if(!rid){showToast('레시피를 선택해 주세요');return;}
   var rec=recipes.find(function(r){return String(r.id)===String(rid);});
