@@ -376,7 +376,7 @@ function renderIngGroupEditor(){
   var el=document.getElementById('ing-group-editor');
   if(!tempIngGroups.length){el.innerHTML='<div style="font-size:13px;color:#aaa;text-align:center;padding:10px">그룹을 추가해 주세요</div>';return;}
   el.innerHTML=tempIngGroups.map(function(g,gi){
-    var units=['g','ml','개','tbsp','tsp','L','kg'];
+    var units=['g','ml','개','tbsp','tsp','L','kg','소량','약간','적당량'];
     var rows=g.ings.map(function(ing,ii){
       return '<div class="ing-row">'+
         '<input type="text" value="'+ing.name+'" placeholder="재료명" oninput="tempIngGroups['+gi+'].ings['+ii+'].name=this.value">'+
@@ -627,7 +627,7 @@ async function saveRecipe(){
   var name=document.getElementById('r-name').value.trim();
   if(!name){showToast('레시피명을 입력해 주세요');return;}
   var validGroups=tempIngGroups.map(function(g){
-    return{groupName:g.groupName,ings:g.ings.filter(function(i){return i.name.trim()&&i.qty>0;})};
+    return{groupName:g.groupName,ings:g.ings.filter(function(i){return i.name.trim();})};
   }).filter(function(g){return g.ings.length;});
   if(!validGroups.length){showToast('재료를 1개 이상 입력해 주세요');return;}
   var validSteps=tempStepGroups.map(function(g){
