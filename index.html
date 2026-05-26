@@ -146,12 +146,11 @@ button:active{transform:scale(.98)}
       <div style="display:flex;gap:6px">
         <select id="recipe-filter-cat" onchange="renderRecipes()" style="width:130px;font-size:13px">
           <option value="">전체 카테고리</option>
-          <option>제과기능사</option><option>제빵기능사</option><option>홈베이커리</option>
-          <option>채식베이커리</option><option>디저트</option><option>기타</option>
         </select>
         <input type="text" id="recipe-search" placeholder="레시피 검색..." oninput="renderRecipes()" style="width:150px;font-size:13px">
       </div>
       <div style="display:flex;gap:6px">
+        <button onclick="openCatModal()" class="btn-sm">📂 카테고리 관리</button>
         <button onclick="printAllRecipes()" class="btn-sm">🖨️ 전체 인쇄</button>
         <button class="btn-primary" onclick="openRecipeModal(null)">+ 레시피 등록</button>
       </div>
@@ -218,12 +217,31 @@ button:active{transform:scale(.98)}
   </div>
 </div>
 
+<!-- 카테고리 관리 모달 -->
+<div class="modal-bg" id="cat-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">카테고리 관리</div>
+      <button class="close-btn" onclick="closeCatModal()">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <input type="text" id="new-cat-input" placeholder="새 카테고리명 입력" style="flex:1" onkeydown="if(event.key==='Enter')addCat()">
+      <button class="btn-primary" onclick="addCat()">추가</button>
+    </div>
+    <div id="cat-list-editor"></div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 <script>
 var API_URL = 'https://script.google.com/macros/s/AKfycbygIviI2Jpl3q6TYcjrwXpcCld6N_tHwoR33Dw3FTdr3ZeG9GyQnbM-qGq5gJzjI5fR/exec';
 var LOGO = 'data:image/png;base64,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';
 var NO_UNIT = ['소량','약간','적당량'];
-var CATS = ['제과기능사','제빵기능사','홈베이커리','채식베이커리','디저트','기타'];
+var DEFAULT_CATS = ['제과기능사','제빵기능사','홈베이커리','채식베이커리','디저트','기타'];
+var CATS = (function(){
+  try { var s=localStorage.getItem('baking_cats'); return s?JSON.parse(s):DEFAULT_CATS.slice(); }
+  catch(e){ return DEFAULT_CATS.slice(); }
+})();
+function saveCats(){ try{ localStorage.setItem('baking_cats',JSON.stringify(CATS)); }catch(e){} }
 var CAT_CLS = {'제과기능사':'b-amber','제빵기능사':'b-teal','홈베이커리':'b-purple','채식베이커리':'b-green','디저트':'b-purple','기타':'b-teal'};
 var UNITS = ['g','ml','개','tbsp','tsp','L','kg','소량','약간','적당량'];
 
@@ -272,7 +290,59 @@ async function api(action, body) {
   } catch(e) { showToast('연결 오류: ' + e.message); return null; }
 }
 
-async function loadAll() { await Promise.all([loadRecipes(), loadHistory()]); }
+
+function refreshCatSelects(){
+  // 레시피 필터 셀렉트
+  var rfc=document.getElementById('recipe-filter-cat');
+  if(rfc){rfc.innerHTML='<option value="">전체 카테고리</option>'+CATS.map(function(c){return '<option>'+c+'</option>';}).join('');}
+  // 레시피 등록 카테고리
+  var rc=document.getElementById('r-cat');
+  if(rc){var cur=rc.value;rc.innerHTML=CATS.map(function(c){return '<option>'+c+'</option>';}).join('');if(CATS.indexOf(cur)>=0)rc.value=cur;}
+  // 수업계획 카테고리 필터
+  var pc=document.getElementById('plan-cat-filter');
+  if(pc){pc.innerHTML='<option value="">전체</option>'+CATS.map(function(c){return '<option>'+c+'</option>';}).join('');}
+}
+
+function openCatModal(){
+  renderCatEditor();
+  document.getElementById('cat-modal').classList.add('open');
+  document.getElementById('new-cat-input').value='';
+  document.getElementById('new-cat-input').focus();
+}
+function closeCatModal(){ document.getElementById('cat-modal').classList.remove('open'); }
+
+function renderCatEditor(){
+  var el=document.getElementById('cat-list-editor');
+  el.innerHTML='';
+  CATS.forEach(function(c,i){
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0efeb';
+    row.innerHTML='<span style="font-size:14px">'+c+'</span>';
+    var del=document.createElement('button');
+    del.className='btn-sm btn-danger';del.textContent='삭제';
+    del.addEventListener('click',(function(idx){return function(){
+      if(!confirm(CATS[idx]+' 카테고리를 삭제하시겠습니까?'))return;
+      CATS.splice(idx,1);saveCats();refreshCatSelects();renderCatEditor();
+    };})(i));
+    row.appendChild(del);
+    el.appendChild(row);
+  });
+  if(!CATS.length) el.innerHTML='<div style="text-align:center;color:#aaa;padding:1rem;font-size:13px">카테고리가 없습니다</div>';
+}
+
+function addCat(){
+  var val=document.getElementById('new-cat-input').value.trim();
+  if(!val){showToast('카테고리명을 입력해 주세요');return;}
+  if(CATS.indexOf(val)>=0){showToast('이미 있는 카테고리예요');return;}
+  CATS.push(val);saveCats();refreshCatSelects();renderCatEditor();
+  document.getElementById('new-cat-input').value='';
+  showToast(val+' 추가됐어요!');
+}
+
+async function loadAll() {
+  refreshCatSelects();
+  await Promise.all([loadRecipes(), loadHistory()]);
+}
 
 async function loadRecipes() {
   var data = await api('getRecipes');
