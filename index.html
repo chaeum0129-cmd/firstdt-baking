@@ -893,17 +893,15 @@ function renderHistory(orders) {
       var classesBox = '<div style="border:1px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 12px;font-size:13px;color:var(--color-text-secondary);margin-bottom:12px;line-height:1.6">' +
         o.classes + '</div>';
 
-      // 5칸 표 (재료명 위, 수량 아래, 가로선만)
+      // 5칸 표 (사각형 테두리 + 행 구분선)
       var items = o.items || [];
       var tableRows = '';
       for (var i = 0; i < items.length; i += 5) {
         var chunk = items.slice(i, i+5);
         while (chunk.length < 5) chunk.push(null);
-        var isLast = (i + 5 >= items.length);
-        var borderBottom = isLast ? '' : 'border-bottom:1px solid var(--color-border-tertiary)';
         tableRows += '<tr>' + chunk.map(function(it) {
-          if (!it) return '<td style="padding:8px 6px;width:20%"></td>';
-          return '<td style="padding:8px 6px;width:20%;' + borderBottom + '">' +
+          if (!it) return '<td style="padding:8px 10px;border:1px solid var(--color-border-tertiary);width:20%"></td>';
+          return '<td style="padding:8px 10px;border:1px solid var(--color-border-tertiary);width:20%">' +
             '<div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">' + it.name + '</div>' +
             '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">' + it.qty + it.unit + '</div></td>';
         }).join('') + '</tr>';
