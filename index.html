@@ -846,20 +846,97 @@ async function saveRecipe() {
 function renderHistory(orders) {
   window._orders = orders;
   var el = document.getElementById('history-list');
-  if (!orders || !orders.length) { el.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📦</div>발주 이력이 없습니다</div>'; return; }
-  el.innerHTML = '';
-  orders.forEach(function(o, oidx) {
-    var card = document.createElement('div');
-    card.className = 'history-card';
-    card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
-      '<div><div style="font-weight:600">' + o.date + '</div><div style="font-size:12px;color:#888;margin-top:2px">' + o.classes + '</div></div>' +
-      '<div id="hd-' + oidx + '"></div></div>' +
-      '<div>' + o.items.map(function(it){ return '<span class="tag">' + it.name + ' ' + it.qty + it.unit + '</span>'; }).join('') + '</div>';
-    el.appendChild(card);
-    var db = document.createElement('button'); db.className = 'btn-sm btn-danger'; db.textContent = '삭제';
-    db.addEventListener('click', (function(idx){ return function(){ deleteOrderByIdx(idx); }; })(oidx));
-    card.querySelector('#hd-' + oidx).appendChild(db);
+  if (!orders || !orders.length) {
+    el.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📦</div>발주 이력이 없습니다</div>'; return;
+  }
+
+  // 월별로 그룹핑
+  var months = {};
+  orders.forEach(function(o, idx) {
+    var key = o.date ? o.date.substring(0, 7) : '기타';
+    if (!months[key]) months[key] = [];
+    months[key].push({order: o, idx: idx});
   });
+
+  el.innerHTML = '';
+  Object.keys(months).sort().reverse().forEach(function(month) {
+    var group = months[month];
+    var isOpen = Object.keys(months).sort().reverse()[0] === month; // 최신 월만 기본 열림
+
+    // 월 헤더
+    var header = document.createElement('div');
+    header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);cursor:pointer;margin-bottom:6px;user-select:none';
+    header.innerHTML = '<div style="display:flex;align-items:center;gap:8px">' +
+      '<span style="font-weight:500;font-size:14px">' + month + '</span>' +
+      '<span style="font-size:12px;color:var(--color-text-secondary)">총 ' + group.length + '건</span></div>' +
+      '<span id="arrow-' + month.replace('.','_') + '" style="font-size:13px;color:var(--color-text-secondary)">' + (isOpen ? '▲' : '▼') + '</span>';
+    el.appendChild(header);
+
+    // 월 컨텐츠
+    var body = document.createElement('div');
+    body.id = 'month-body-' + month.replace('.','_');
+    body.style.display = isOpen ? 'block' : 'none';
+    body.style.marginBottom = '12px';
+
+    group.forEach(function(item) {
+      var o = item.order;
+      var oidx = item.idx;
+      var card = document.createElement('div');
+      card.className = 'history-card';
+      card.style.marginBottom = '8px';
+
+      // 5칸 표 만들기
+      var tableRows = '';
+      var items = o.items || [];
+      for (var i = 0; i < items.length; i += 5) {
+        var row = items.slice(i, i + 5);
+        // 빈칸 채우기
+        while (row.length < 5) row.push(null);
+        tableRows += '<tr>' + row.map(function(it) {
+          if (!it) return '<td style="padding:5px 8px;border:0.5px solid var(--color-border-tertiary)"></td>';
+          return '<td style="padding:5px 8px;border:0.5px solid var(--color-border-tertiary);font-size:12px">' +
+            '<div style="font-weight:500;color:var(--color-text-primary)">' + it.name + '</div>' +
+            '<div style="color:var(--color-text-secondary);font-size:11px">' + it.qty + it.unit + '</div></td>';
+        }).join('') + '</tr>';
+      }
+
+      card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">' +
+        '<div><div style="font-weight:600;font-size:14px">' + o.date + '</div>' +
+        '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">' + o.classes + '</div></div>' +
+        '<div style="display:flex;gap:6px;align-items:center">' +
+        '<button class="btn-sm" onclick="copyHistoryText(' + oidx + ')">📋 복사</button>' +
+        '<div id="hd-' + oidx + '"></div></div></div>' +
+        '<div style="overflow-x:auto">' +
+        '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
+        '<colgroup>' + '<col style="width:20%">'.repeat(5) + '</colgroup>' +
+        '<tbody>' + tableRows + '</tbody></table></div>';
+
+      body.appendChild(card);
+      var db = document.createElement('button'); db.className = 'btn-sm btn-danger'; db.textContent = '삭제';
+      db.addEventListener('click', (function(idx){ return function(){ deleteOrderByIdx(idx); }; })(oidx));
+      card.querySelector('#hd-' + oidx).appendChild(db);
+    });
+
+    el.appendChild(body);
+
+    // 접기/펼치기 이벤트
+    header.addEventListener('click', (function(m) {
+      return function() {
+        var b = document.getElementById('month-body-' + m.replace('.','_'));
+        var a = document.getElementById('arrow-' + m.replace('.','_'));
+        if (b.style.display === 'none') { b.style.display = 'block'; a.textContent = '▲'; }
+        else { b.style.display = 'none'; a.textContent = '▼'; }
+      };
+    })(month));
+  });
+}
+
+function copyHistoryText(idx) {
+  var o = window._orders && window._orders[idx];
+  if (!o) return;
+  var lines = ['[베이킹 발주] ' + o.date, '수업: ' + o.classes, ''];
+  (o.items||[]).forEach(function(it){ lines.push(it.name + ' ' + it.qty + it.unit); });
+  navigator.clipboard.writeText(lines.join('\n')).then(function(){ showToast('복사됐어요!'); });
 }
 function deleteOrderByIdx(i) { if (window._orders && window._orders[i]) deleteOrder(window._orders[i].id); }
 async function deleteOrder(id) {
