@@ -850,7 +850,7 @@ function renderHistory(orders) {
     el.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📦</div>발주 이력이 없습니다</div>'; return;
   }
 
-  // 월별로 그룹핑
+  // 월별 그룹핑
   var months = {};
   orders.forEach(function(o, idx) {
     var key = o.date ? o.date.substring(0, 7) : '기타';
@@ -859,75 +859,86 @@ function renderHistory(orders) {
   });
 
   el.innerHTML = '';
-  Object.keys(months).sort().reverse().forEach(function(month) {
-    var group = months[month];
-    var isOpen = Object.keys(months).sort().reverse()[0] === month; // 최신 월만 기본 열림
+  var sortedMonths = Object.keys(months).sort().reverse();
 
-    // 월 헤더
+  sortedMonths.forEach(function(month, mi) {
+    var group = months[month];
+    var isOpen = mi === 0;
+    var safeMonth = month.replace(/\./g,'_').replace(/\s/g,'_');
+
+    // 월 헤더 (접기/펼치기)
     var header = document.createElement('div');
     header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);cursor:pointer;margin-bottom:6px;user-select:none';
-    header.innerHTML = '<div style="display:flex;align-items:center;gap:8px">' +
+    header.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px">' +
       '<span style="font-weight:500;font-size:14px">' + month + '</span>' +
       '<span style="font-size:12px;color:var(--color-text-secondary)">총 ' + group.length + '건</span></div>' +
-      '<span id="arrow-' + month.replace('.','_') + '" style="font-size:13px;color:var(--color-text-secondary)">' + (isOpen ? '▲' : '▼') + '</span>';
+      '<span id="arr-' + safeMonth + '" style="font-size:12px;color:var(--color-text-secondary)">' + (isOpen?'▲':'▼') + '</span>';
     el.appendChild(header);
 
-    // 월 컨텐츠
     var body = document.createElement('div');
-    body.id = 'month-body-' + month.replace('.','_');
+    body.id = 'mb-' + safeMonth;
     body.style.display = isOpen ? 'block' : 'none';
-    body.style.marginBottom = '12px';
+    body.style.marginBottom = '16px';
 
     group.forEach(function(item) {
       var o = item.order;
       var oidx = item.idx;
+
       var card = document.createElement('div');
       card.className = 'history-card';
-      card.style.marginBottom = '8px';
+      card.style.marginBottom = '10px';
 
-      // 5칸 표 만들기
-      var tableRows = '';
+      // 수업 목록 박스
+      var classesBox = '<div style="border:1px solid var(--color-border-secondary);border-radius:var(--border-radius-md);padding:8px 12px;font-size:13px;color:var(--color-text-secondary);margin-bottom:12px;line-height:1.6">' +
+        o.classes + '</div>';
+
+      // 5칸 표 (재료명 위, 수량 아래, 가로선만)
       var items = o.items || [];
+      var tableRows = '';
       for (var i = 0; i < items.length; i += 5) {
-        var row = items.slice(i, i + 5);
-        // 빈칸 채우기
-        while (row.length < 5) row.push(null);
-        tableRows += '<tr>' + row.map(function(it) {
-          if (!it) return '<td style="padding:5px 8px;border:0.5px solid var(--color-border-tertiary)"></td>';
-          return '<td style="padding:5px 8px;border:0.5px solid var(--color-border-tertiary);font-size:12px">' +
-            '<div style="font-weight:500;color:var(--color-text-primary)">' + it.name + '</div>' +
-            '<div style="color:var(--color-text-secondary);font-size:11px">' + it.qty + it.unit + '</div></td>';
+        var chunk = items.slice(i, i+5);
+        while (chunk.length < 5) chunk.push(null);
+        var isLast = (i + 5 >= items.length);
+        var borderBottom = isLast ? '' : 'border-bottom:1px solid var(--color-border-tertiary)';
+        tableRows += '<tr>' + chunk.map(function(it) {
+          if (!it) return '<td style="padding:8px 6px;width:20%"></td>';
+          return '<td style="padding:8px 6px;width:20%;' + borderBottom + '">' +
+            '<div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">' + it.name + '</div>' +
+            '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">' + it.qty + it.unit + '</div></td>';
         }).join('') + '</tr>';
       }
 
-      card.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">' +
-        '<div><div style="font-weight:600;font-size:14px">' + o.date + '</div>' +
-        '<div style="font-size:12px;color:var(--color-text-secondary);margin-top:2px">' + o.classes + '</div></div>' +
-        '<div style="display:flex;gap:6px;align-items:center">' +
-        '<button class="btn-sm" onclick="copyHistoryText(' + oidx + ')">📋 복사</button>' +
-        '<div id="hd-' + oidx + '"></div></div></div>' +
-        '<div style="overflow-x:auto">' +
+      var table = '<div style="overflow-x:auto">' +
         '<table style="width:100%;border-collapse:collapse;table-layout:fixed">' +
-        '<colgroup>' + '<col style="width:20%">'.repeat(5) + '</colgroup>' +
         '<tbody>' + tableRows + '</tbody></table></div>';
 
+      card.innerHTML =
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+        '<div style="font-weight:600;font-size:15px">' + o.date + '</div>' +
+        '<div style="display:flex;gap:6px">' +
+        '<button class="btn-sm" onclick="copyHistoryText(' + oidx + ')">📋 복사</button>' +
+        '<div id="hd-' + oidx + '"></div></div></div>' +
+        classesBox + table;
+
       body.appendChild(card);
-      var db = document.createElement('button'); db.className = 'btn-sm btn-danger'; db.textContent = '삭제';
+
+      var db = document.createElement('button');
+      db.className = 'btn-sm btn-danger'; db.textContent = '삭제';
       db.addEventListener('click', (function(idx){ return function(){ deleteOrderByIdx(idx); }; })(oidx));
       card.querySelector('#hd-' + oidx).appendChild(db);
     });
 
     el.appendChild(body);
 
-    // 접기/펼치기 이벤트
-    header.addEventListener('click', (function(m) {
+    header.addEventListener('click', (function(sm) {
       return function() {
-        var b = document.getElementById('month-body-' + m.replace('.','_'));
-        var a = document.getElementById('arrow-' + m.replace('.','_'));
+        var b = document.getElementById('mb-' + sm);
+        var a = document.getElementById('arr-' + sm);
         if (b.style.display === 'none') { b.style.display = 'block'; a.textContent = '▲'; }
         else { b.style.display = 'none'; a.textContent = '▼'; }
       };
-    })(month));
+    })(safeMonth));
   });
 }
 
