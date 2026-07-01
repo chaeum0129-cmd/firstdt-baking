@@ -157,6 +157,7 @@ button:active{transform:scale(.98)}
       </div>
       <div style="display:flex;gap:6px">
         <button onclick="openCatModal()" class="btn-sm">📂 카테고리 관리</button>
+        <button onclick="openCostPrintModal()" class="btn-sm">📄 재료비 명세서</button>
         <button onclick="printAllRecipes()" class="btn-sm">🖨️ 전체 인쇄</button>
         <button class="btn-primary" onclick="openRecipeModal(null)">+ 레시피 등록</button>
       </div>
@@ -277,6 +278,35 @@ button:active{transform:scale(.98)}
       <button class="btn-primary" onclick="addCat()">추가</button>
     </div>
     <div id="cat-list-editor"></div>
+  </div>
+</div>
+<!-- 재료비 명세서 모달 -->
+<div class="modal-bg" id="cost-print-modal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <div class="modal-title">📄 재료비 명세서 인쇄</div>
+      <button class="close-btn" onclick="closeCostPrintModal()">✕</button>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>제출처 (기관명/업체명)</label>
+      <input type="text" id="cost-print-target" placeholder="예: ○○기관, ○○업체">
+    </div>
+    <div style="margin-bottom:12px">
+      <label>날짜</label>
+      <input type="date" id="cost-print-date">
+    </div>
+    <div style="margin-bottom:12px">
+      <label>제품 선택</label>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <button class="btn-sm" onclick="selectAllCostRecipes()">전체 선택</button>
+        <button class="btn-sm" onclick="deselectAllCostRecipes()">전체 해제</button>
+      </div>
+      <div id="cost-recipe-checklist" style="max-height:200px;overflow-y:auto;border:1px solid #e5e4e0;border-radius:8px;padding:8px"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="closeCostPrintModal()">취소</button>
+      <button class="btn-primary" onclick="printCostSheet()">🖨️ 인쇄</button>
+    </div>
   </div>
 </div>
 <div class="toast" id="toast"></div>
@@ -1133,6 +1163,132 @@ function calcIngCost(ings) {
 
 function calcRecipeCost(r) {
   return calcIngCost(getAllIngs(r));
+}
+
+
+// ── 재료비 명세서 ──
+function openCostPrintModal() {
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById('cost-print-date').value = today;
+  document.getElementById('cost-print-target').value = '';
+
+  // 카테고리 필터 기준 레시피 목록
+  var fc = document.getElementById('recipe-filter-cat').value;
+  var list = fc ? recipes.filter(function(r){ return r.cat===fc; }) : recipes;
+
+  var el = document.getElementById('cost-recipe-checklist');
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;color:#aaa;padding:1rem;font-size:13px">레시피가 없습니다</div>';
+  } else {
+    el.innerHTML = list.map(function(r, i) {
+      var cost = calcRecipeCost(r);
+      return '<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px">' +
+        '<input type="checkbox" checked value="' + r.id + '" style="width:auto"> ' +
+        '<span style="flex:1">' + r.name + '</span>' +
+        (cost !== null ? '<span class="cost-badge">' + cost.toLocaleString() + '원</span>' : '<span style="font-size:11px;color:#aaa">단가 미등록</span>') +
+        '</label>';
+    }).join('');
+  }
+  document.getElementById('cost-print-modal').classList.add('open');
+}
+
+function closeCostPrintModal() {
+  document.getElementById('cost-print-modal').classList.remove('open');
+}
+
+function selectAllCostRecipes() {
+  document.querySelectorAll('#cost-recipe-checklist input[type=checkbox]').forEach(function(cb){ cb.checked=true; });
+}
+function deselectAllCostRecipes() {
+  document.querySelectorAll('#cost-recipe-checklist input[type=checkbox]').forEach(function(cb){ cb.checked=false; });
+}
+
+function printCostSheet() {
+  var target = document.getElementById('cost-print-target').value.trim() || '　';
+  var date = document.getElementById('cost-print-date').value;
+  var dateStr = date ? new Date(date).toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'}) : '';
+
+  // 선택된 레시피 ID
+  var checkedIds = [];
+  document.querySelectorAll('#cost-recipe-checklist input[type=checkbox]:checked').forEach(function(cb){
+    checkedIds.push(cb.value);
+  });
+  if (!checkedIds.length) { showToast('제품을 1개 이상 선택해 주세요'); return; }
+
+  var selectedRecipes = recipes.filter(function(r){ return checkedIds.indexOf(String(r.id)) >= 0; });
+
+  var totalAll = 0;
+
+  // 제품별 표 생성
+  var productsHtml = selectedRecipes.map(function(r) {
+    var ings = getAllIngs(r);
+    var recipeTotalCost = 0;
+    var rows = ings.map(function(ing) {
+      var isNoUnit = NO_UNIT.indexOf(ing.unit) >= 0;
+      var p = priceDB.find(function(p){ return p.name===ing.name && p.unit===ing.unit; });
+      var unitCost = (p && p.amount > 0) ? (p.price / p.amount) : null;
+      var ingCost = (!isNoUnit && unitCost !== null) ? Math.round(unitCost * ing.qty) : null;
+      if (ingCost !== null) recipeTotalCost += ingCost;
+      return '<tr>' +
+        '<td style="padding:6px 10px;border:1px solid #ddd;font-size:12px">' + ing.name + '</td>' +
+        '<td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:center">' + (isNoUnit ? ing.unit : ing.qty + ing.unit) + '</td>' +
+        '<td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right">' + (unitCost !== null ? unitCost.toFixed(1) + '원/' + ing.unit : '-') + '</td>' +
+        '<td style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right;font-weight:500">' + (ingCost !== null ? ingCost.toLocaleString() + '원' : '-') + '</td>' +
+        '</tr>';
+    }).join('');
+
+    totalAll += recipeTotalCost;
+
+    return '<div style="margin-bottom:24px;page-break-inside:avoid">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;background:#f9f6f1;padding:8px 12px;border-radius:6px 6px 0 0;border:1px solid #ddd;border-bottom:none">' +
+      '<span style="font-size:14px;font-weight:700;color:#2c2c2c">' + r.name + '</span>' +
+      '<span style="font-size:13px;font-weight:600;color:#085041">1인 재료비: ' + (recipeTotalCost > 0 ? recipeTotalCost.toLocaleString() + '원' : '미산출') + '</span>' +
+      '</div>' +
+      '<table style="width:100%;border-collapse:collapse">' +
+      '<thead><tr style="background:#f5f4f0">' +
+      '<th style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:left;font-weight:600">재료명</th>' +
+      '<th style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:center;font-weight:600">수량(1인)</th>' +
+      '<th style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right;font-weight:600">단가</th>' +
+      '<th style="padding:6px 10px;border:1px solid #ddd;font-size:12px;text-align:right;font-weight:600">재료비</th>' +
+      '</tr></thead>' +
+      '<tbody>' + rows + '</tbody>' +
+      '</table></div>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">' +
+    '<title>재료비 명세서</title>' +
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:sans-serif;color:#2c2c2c;padding:32px 36px}' +
+    '@media print{body{padding:20px 28px}}</style></head><body>' +
+
+    // 헤더
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:2px solid #c8a97e;margin-bottom:20px">' +
+    '<img src="' + LOGO + '" style="height:55px;object-fit:contain">' +
+    '<div style="text-align:right">' +
+    '<div style="font-size:20px;font-weight:700;margin-bottom:4px">재료비 명세서</div>' +
+    '<div style="font-size:12px;color:#666">제출처: <b>' + target + '</b></div>' +
+    '<div style="font-size:12px;color:#666;margin-top:2px">' + dateStr + '</div>' +
+    '</div></div>' +
+
+    // 제품 목록
+    productsHtml +
+
+    // 합계
+    '<div style="margin-top:16px;padding:12px 16px;background:#f9f6f1;border-radius:8px;border:1px solid #e0d5c5;display:flex;justify-content:space-between;align-items:center">' +
+    '<span style="font-size:14px;font-weight:700">총 합계 (' + selectedRecipes.length + '개 제품)</span>' +
+    '<span style="font-size:16px;font-weight:700;color:#085041">' + totalAll.toLocaleString() + '원</span>' +
+    '</div>' +
+
+    // 하단
+    '<div style="margin-top:20px;padding-top:10px;border-top:1px solid #e5e4e0;text-align:center;font-size:11px;color:#aaa">' +
+    '퍼스트바리스타제과제빵화성학원</div>' +
+
+    '<script>window.onload=function(){window.print();};<\/script>' +
+    '</body></html>';
+
+  var w = window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+  closeCostPrintModal();
 }
 
 window.onload = function(){ loadAll(); };
