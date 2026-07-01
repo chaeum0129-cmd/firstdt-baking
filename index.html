@@ -75,8 +75,8 @@ button:active{transform:scale(.98)}
 .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1a1a18;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:300;opacity:0;transition:.3s;pointer-events:none}
 .toast.show{opacity:1}
 .gdrive-tip{background:#e8f4fd;border:1px solid #b3d9f7;border-radius:8px;padding:10px 12px;font-size:12px;color:#1a5276;line-height:1.7;margin-bottom:8px}
-.ing-list-grid{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
-.ing-list-item{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid transparent;transition:.15s}
+.ing-list-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:4px}
+.ing-list-item{display:flex;align-items:center;justify-content:center;text-align:center;gap:4px;padding:6px 8px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid transparent;transition:.15s;word-break:keep-all}
 .ing-list-item.has-price{background:#eaf3de;border-color:#b5d89a;color:#27500a}
 .ing-list-item.no-price{background:#f5f4f0;border-color:#e5e4e0;color:#666}
 .ing-list-item:hover{opacity:.8}
