@@ -1150,7 +1150,7 @@ function addPriceItem() {
   var unit = document.getElementById('pi-unit').value;
   var price = parseFloat(document.getElementById('pi-price').value) || 0;
   if (!name) { showToast('재료명을 입력해 주세요'); return; }
-  if (!amount || !price) { showToast('용량과 단가를 입력해 주세요'); return; }
+  if (!amount) { showToast('용량을 입력해 주세요'); return; }
   var exist = priceDB.findIndex(function(p){ return p.name === name && p.unit === unit; });
   if (exist >= 0) {
     if (!confirm(name + ' 단가를 업데이트하시겠습니까?')) return;
