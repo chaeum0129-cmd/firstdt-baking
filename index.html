@@ -1378,24 +1378,18 @@ function printCostSheet() {
 function renderIngList() {
   var el = document.getElementById('ing-list-wrap');
   if (!el) return;
+  el.innerHTML = '';
 
-  // 모든 레시피에서 재료 수집 (중복 제거)
-  var ingMap = {}; // key: "name__unit"
+  var ingMap = {};
   recipes.forEach(function(r) {
     getAllIngs(r).forEach(function(ing) {
       var key = ing.name + '__' + ing.unit;
-      if (!ingMap[key]) {
-        ingMap[key] = {name: ing.name, unit: ing.unit, usedIn: []};
-      }
-      if (ingMap[key].usedIn.indexOf(r.name) < 0) {
-        ingMap[key].usedIn.push(r.name);
-      }
+      if (!ingMap[key]) ingMap[key] = {name:ing.name, unit:ing.unit, usedIn:[]};
+      if (ingMap[key].usedIn.indexOf(r.name) < 0) ingMap[key].usedIn.push(r.name);
     });
   });
 
   var allIngs = Object.values(ingMap).sort(function(a,b){ return a.name.localeCompare(b.name,'ko'); });
-
-  // 검색 필터
   var q = (document.getElementById('ing-list-search') ? document.getElementById('ing-list-search').value : '').toLowerCase();
   if (q) allIngs = allIngs.filter(function(i){ return i.name.toLowerCase().includes(q); });
 
@@ -1404,38 +1398,55 @@ function renderIngList() {
     return;
   }
 
-  // 단가 등록 여부로 분류
-  var withPrice = allIngs.filter(function(i){ return priceDB.find(function(p){ return p.name===i.name && p.unit===i.unit; }); });
-  var noPrice = allIngs.filter(function(i){ return !priceDB.find(function(p){ return p.name===i.name && p.unit===i.unit; }); });
+  var withPrice = allIngs.filter(function(i){ return priceDB.find(function(p){ return p.name===i.name&&p.unit===i.unit; }); });
+  var noPrice = allIngs.filter(function(i){ return !priceDB.find(function(p){ return p.name===i.name&&p.unit===i.unit; }); });
 
-  var html = '<div style="font-size:12px;color:#666;margin-bottom:6px">총 <b>' + allIngs.length + '가지</b> 재료 · 단가 등록 <b style="color:#27500a">' + withPrice.length + '가지</b> · 미등록 <b style="color:#c0392b">' + noPrice.length + '가지</b></div>';
+  // 요약
+  var summary = document.createElement('div');
+  summary.style.cssText = 'font-size:12px;color:#666;margin-bottom:8px';
+  summary.innerHTML = '총 <b>' + allIngs.length + '가지</b> 재료 · 단가 등록 <b style="color:#27500a">' + withPrice.length + '가지</b> · 미등록 <b style="color:#c0392b">' + noPrice.length + '가지</b>';
+  el.appendChild(summary);
 
+  // 미등록
   if (noPrice.length) {
-    html += '<div style="font-size:12px;font-weight:500;color:#666;margin-bottom:5px">⚠️ 단가 미등록</div>';
-    html += '<div class="ing-list-grid">';
-    html += noPrice.map(function(i) {
+    var label1 = document.createElement('div');
+    label1.style.cssText = 'font-size:12px;font-weight:500;color:#666;margin-bottom:5px';
+    label1.textContent = '⚠️ 단가 미등록';
+    el.appendChild(label1);
+    var grid1 = document.createElement('div');
+    grid1.className = 'ing-list-grid';
+    grid1.style.marginBottom = '10px';
+    noPrice.forEach(function(i) {
       var tip = i.usedIn.slice(0,3).join(', ') + (i.usedIn.length > 3 ? ' 외 ' + (i.usedIn.length-3) + '개' : '');
-      return '<span class="ing-list-item no-price" title="사용 레시피: ' + tip + '" onclick="fillPriceForm('' + i.name + '','' + i.unit + '')">' +
-        i.name + ' <span style="font-size:10px;color:#888">(' + i.unit + ')</span>' +
-        '</span>';
-    }).join('');
-    html += '</div>';
+      var span = document.createElement('span');
+      span.className = 'ing-list-item no-price';
+      span.title = '사용 레시피: ' + tip;
+      span.innerHTML = i.name + ' <span style="font-size:10px;color:#888">('+i.unit+')</span>';
+      span.addEventListener('click', (function(n,u){ return function(){ fillPriceForm(n,u); }; })(i.name, i.unit));
+      grid1.appendChild(span);
+    });
+    el.appendChild(grid1);
   }
 
+  // 등록 완료
   if (withPrice.length) {
-    html += '<div style="font-size:12px;font-weight:500;color:#27500a;margin:10px 0 5px">✅ 단가 등록 완료</div>';
-    html += '<div class="ing-list-grid">';
-    html += withPrice.map(function(i) {
-      var p = priceDB.find(function(p){ return p.name===i.name && p.unit===i.unit; });
+    var label2 = document.createElement('div');
+    label2.style.cssText = 'font-size:12px;font-weight:500;color:#27500a;margin-bottom:5px';
+    label2.textContent = '✅ 단가 등록 완료';
+    el.appendChild(label2);
+    var grid2 = document.createElement('div');
+    grid2.className = 'ing-list-grid';
+    withPrice.forEach(function(i) {
+      var p = priceDB.find(function(p){ return p.name===i.name&&p.unit===i.unit; });
       var tip = i.usedIn.slice(0,3).join(', ') + (i.usedIn.length > 3 ? ' 외 ' + (i.usedIn.length-3) + '개' : '');
-      return '<span class="ing-list-item has-price" title="사용 레시피: ' + tip + '">' +
-        i.name + ' <span style="font-size:10px;opacity:.8">' + p.price.toLocaleString() + '원/' + p.amount + p.unit + '</span>' +
-        '</span>';
-    }).join('');
-    html += '</div>';
+      var span = document.createElement('span');
+      span.className = 'ing-list-item has-price';
+      span.title = '사용 레시피: ' + tip;
+      span.innerHTML = i.name + ' <span style="font-size:10px;opacity:.8">' + p.price.toLocaleString() + '원/' + p.amount + p.unit + '</span>';
+      grid2.appendChild(span);
+    });
+    el.appendChild(grid2);
   }
-
-  el.innerHTML = html;
 }
 
 // 재료 클릭시 단가 등록 폼에 자동 입력
