@@ -1124,6 +1124,9 @@ function switchTab(t) {
     document.getElementById('tab-'+n).style.display = n===t ? 'block' : 'none';
     document.querySelectorAll('.nav-btn')[i].classList.toggle('active', n===t);
   });
+  // 재료단가 탭은 더 넓게
+  var main = document.querySelector('.main');
+  if (main) main.style.maxWidth = t === 'price' ? '1100px' : '760px';
   if (t === 'history') loadHistory();
   if (t === 'price') { renderPriceList(); renderIngList(); }
   if (t === 'recipe') renderRecipes();
