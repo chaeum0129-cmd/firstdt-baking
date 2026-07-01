@@ -324,6 +324,13 @@ var CAT_CLS = {'제과기능사':'b-amber','제빵기능사':'b-teal','홈베이
 var UNITS = ['g','ml','개','tbsp','tsp','L','kg','소량','약간','적당량'];
 
 var recipes = [], planItems = [], editingId = null;
+var ADMIN_PW = '0852';
+function checkPw(callback) {
+  var pw = prompt('비밀번호를 입력하세요');
+  if (pw === null) return; // 취소
+  if (pw === ADMIN_PW) { callback(); }
+  else { showToast('비밀번호가 틀렸습니다'); }
+}
 var priceDB = []; // 재료 단가 DB
 var tempIngGroups = [], tempStepGroups = [], tempBakeSteps = [];
 var printingRecipe = null;
@@ -400,8 +407,10 @@ function renderCatEditor(){
     var del=document.createElement('button');
     del.className='btn-sm btn-danger';del.textContent='삭제';
     del.addEventListener('click',(function(idx){return function(){
-      if(!confirm(CATS[idx]+' 카테고리를 삭제하시겠습니까?'))return;
-      CATS.splice(idx,1);saveCats();refreshCatSelects();renderCatEditor();
+      checkPw(function(){
+        if(!confirm(CATS[idx]+' 카테고리를 삭제하시겠습니까?'))return;
+        CATS.splice(idx,1);saveCats();refreshCatSelects();renderCatEditor();
+      });
     };})(i));
     row.appendChild(del);
     el.appendChild(row);
@@ -790,7 +799,7 @@ function renderRecipes() {
     var b1 = document.createElement('button'); b1.className = 'btn-sm'; b1.textContent = '📋 상세';
     b1.addEventListener('click', (function(rec){ return function(){ showDetail(rec); }; })(r));
     var b2 = document.createElement('button'); b2.className = 'btn-sm'; b2.textContent = '수정';
-    b2.addEventListener('click', (function(rec){ return function(){ openRecipeModal(rec); }; })(r));
+    b2.addEventListener('click', (function(rec){ return function(){ checkPw(function(){ openRecipeModal(rec); }); }; })(r));
     var b3 = document.createElement('button'); b3.className = 'btn-sm btn-danger'; b3.textContent = '삭제';
     b3.addEventListener('click', (function(rid){ return function(){ deleteRecipe(rid); }; })(r.id));
     btnDiv.appendChild(b1); btnDiv.appendChild(b2); btnDiv.appendChild(b3);
@@ -932,9 +941,11 @@ function openRecipeModal(r) {
 function closeRecipeModal() { document.getElementById('recipe-modal').classList.remove('open'); }
 
 async function deleteRecipe(id) {
-  if (!confirm('삭제하시겠습니까?')) return;
-  var res = await api('deleteRecipe', {id: id});
-  if (res && res.success) { showToast('삭제됐어요'); loadRecipes(); }
+  checkPw(async function() {
+    if (!confirm('삭제하시겠습니까?')) return;
+    var res = await api('deleteRecipe', {id: id});
+    if (res && res.success) { showToast('삭제됐어요'); loadRecipes(); }
+  });
 }
 
 async function saveRecipe() {
@@ -1065,7 +1076,11 @@ function copyHistoryText(idx) {
   (o.items||[]).forEach(function(it){ lines.push(it.name + ' ' + it.qty + it.unit); });
   navigator.clipboard.writeText(lines.join('\n')).then(function(){ showToast('복사됐어요!'); });
 }
-function deleteOrderByIdx(i) { if (window._orders && window._orders[i]) deleteOrder(window._orders[i].id); }
+function deleteOrderByIdx(i) {
+  checkPw(function() {
+    if (window._orders && window._orders[i]) deleteOrder(window._orders[i].id);
+  });
+}
 async function deleteOrder(id) {
   if (!confirm('삭제하시겠습니까?')) return;
   var res = await api('deleteOrder', {id: id});
@@ -1119,11 +1134,13 @@ function addPriceItem() {
 }
 
 function deletePriceItem(i) {
-  if (!confirm('삭제하시겠습니까?')) return;
-  priceDB.splice(i, 1);
-  savePriceDB();
-  renderPriceList();
-  renderRecipes();
+  checkPw(function() {
+    if (!confirm('삭제하시겠습니까?')) return;
+    priceDB.splice(i, 1);
+    savePriceDB();
+    renderPriceList();
+    renderRecipes();
+  });
 }
 
 function renderPriceList() {
