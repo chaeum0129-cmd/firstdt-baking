@@ -1417,7 +1417,7 @@ function downloadCostExcel() {
   });
   lines.push('전체합계' + T + String(totalAll));
   if (persons > 1) lines.push(persons + pUnit + T + String(totalAll * persons));
-  var bom = '﻿';
+  var bom = '\uFEFF';
   var blob = new Blob([bom + lines.join(N)], {type: 'text/plain;charset=utf-8'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
