@@ -1414,9 +1414,9 @@ function downloadCostExcel() {
   lines.push('1' + pUnit + ' 총 합계	' + totalAll.toLocaleString() + '원');
   if (persons > 1) lines.push(persons + pUnit + ' 총 합계	' + (totalAll*persons).toLocaleString() + '원');
 
-  var bom = '﻿';
-  var blob = new Blob([bom + lines.join('
-')], {type:'text/tab-separated-values;charset=utf-8'});
+  var bom = '\uFEFF';
+  var sep = String.fromCharCode(10);
+  var blob = new Blob([bom + lines.join(sep)], {type:'text/tab-separated-values;charset=utf-8'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url; a.download = '재료비명세서_' + (date||'') + '.xls'; a.click();
