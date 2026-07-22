@@ -1216,7 +1216,7 @@ function calcIngCost(ings) {
       hasPrice = true;
     }
   });
-  return hasPrice ? Math.round(total) : null;
+  return hasPrice ? Math.floor(total / 10) * 10 : null;
 }
 
 function calcRecipeCost(r) {
@@ -1312,7 +1312,7 @@ function printCostSheet() {
       var isNoUnit = NO_UNIT.indexOf(ing.unit) >= 0;
       var p = priceDB.find(function(p){ return p.name===ing.name && p.unit===ing.unit; });
       var unitCost = (p && p.amount > 0) ? (p.price / p.amount) : null;
-      var ingCostPer1 = (!isNoUnit && unitCost !== null) ? Math.round(unitCost * ing.qty) : null;
+      var ingCostPer1 = (!isNoUnit && unitCost !== null) ? Math.floor(unitCost * ing.qty / 10) * 10 : null;
       var ingCostTotal = ingCostPer1 !== null ? ingCostPer1 * persons : null;
       if (ingCostPer1 !== null) recipeTotalCost += ingCostPer1;
       return '<tr>' +
@@ -1399,7 +1399,7 @@ function downloadCostExcel() {
       var isNoUnit = NO_UNIT.indexOf(ing.unit) >= 0;
       var p = priceDB.find(function(px){ return px.name===ing.name && px.unit===ing.unit; });
       var unitCost = (p && p.amount > 0) ? (p.price / p.amount) : null;
-      var ingCost = (!isNoUnit && unitCost !== null) ? Math.round(unitCost * ing.qty) : null;
+      var ingCost = (!isNoUnit && unitCost !== null) ? Math.floor(unitCost * ing.qty / 10) * 10 : null;
       if (ingCost !== null) recipeCost += ingCost;
       var row = [ing.name,
         isNoUnit ? ing.unit : String(ing.qty),
@@ -1417,7 +1417,7 @@ function downloadCostExcel() {
   });
   lines.push('전체합계' + T + String(totalAll));
   if (persons > 1) lines.push(persons + pUnit + T + String(totalAll * persons));
-  var bom = '\uFEFF';
+  var bom = '﻿';
   var blob = new Blob([bom + lines.join(N)], {type: 'text/plain;charset=utf-8'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
