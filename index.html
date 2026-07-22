@@ -1753,8 +1753,7 @@ function downloadSumExcel() {
   if (!checkedIds.length) { showToast('제품을 1개 이상 선택해 주세요'); return; }
   var selectedRecipes = recipes.filter(function(r){ return checkedIds.indexOf(String(r.id)) >= 0; });
 
-  var catMap = {};
-  var catOrder = [];
+  var catMap = {}, catOrder = [];
   selectedRecipes.forEach(function(r) {
     if (!catMap[r.cat]) { catMap[r.cat] = []; catOrder.push(r.cat); }
     catMap[r.cat].push(r);
@@ -1767,57 +1766,66 @@ function downloadSumExcel() {
     return qty + unit;
   }
 
-  // SheetJS로 엑셀 생성
   var script = document.createElement('script');
   script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
   script.onload = function() {
     var wb = XLSX.utils.book_new();
     var wsData = [];
+    var merges = [];
+    var rowStyles = []; // 각 행의 스타일 정보
 
-    // 제목행
-    wsData.push(['퍼스트바리스타제과제빵화성학원 재료비 견적서']);
-    wsData.push(['견적일: ' + date, '', '제출처: ' + target, '', '기준: ' + persons + pUnit]);
-    wsData.push(['대상 제품: ' + selectedRecipes.map(function(r){return r.name;}).join(', ')]);
-    wsData.push([]);
+    function addRow(cells, style) {
+      wsData.push(cells);
+      rowStyles.push(style || 'normal');
+    }
+
+    // 제목
+    addRow(['퍼스트바리스타제과제빵화성학원 재료비 견적서','','','','','',''], 'title');
+    merges.push({s:{r:0,c:0}, e:{r:0,c:6}});
+
+    // 기본정보
+    addRow(['견적일', date, '', '제출처', target||'-', '', persons > 1 ? '기준: '+persons+pUnit : ''], 'info');
+    addRow(['대상 제품', selectedRecipes.map(function(r){return r.name;}).join(', '),'','','','',''], 'info');
+    merges.push({s:{r:2,c:1}, e:{r:2,c:6}});
+
+    // 빈행
+    addRow(['','','','','','',''], 'empty');
 
     // 헤더
-    wsData.push(['재료', '제품 종류', '수량', '인원', '단가(원)', '금액(원)', '카테고리 소계(원)']);
+    addRow(['재료','제품 종류','수량','인원','단가(원)','금액(원)','총금액(원)'], 'header');
 
     var grandTotal = 0;
+    var rowIdx = 5;
 
     catOrder.forEach(function(cat) {
       var catRecipes = catMap[cat];
-      var ingMap = {};
-      var ingOrder = [];
+      var ingMap = {}, ingOrder = [];
       catRecipes.forEach(function(r) {
         getAllIngs(r).forEach(function(ing) {
-          var key = ing.name + '__' + ing.unit;
-          if (!ingMap[key]) { ingMap[key] = {name:ing.name, unit:ing.unit, qty1:0, products:[]}; ingOrder.push(key); }
+          var key = ing.name+'__'+ing.unit;
+          if (!ingMap[key]) { ingMap[key]={name:ing.name,unit:ing.unit,qty1:0,products:[]}; ingOrder.push(key); }
           ingMap[key].qty1 += ing.qty;
-          if (ingMap[key].products.indexOf(r.name) < 0) ingMap[key].products.push(r.name);
+          if (ingMap[key].products.indexOf(r.name)<0) ingMap[key].products.push(r.name);
         });
       });
 
       var catTotal = 0;
-      var catRows = [];
-
+      var catIngRows = [];
       ingOrder.forEach(function(key) {
         var ing = ingMap[key];
-        var isNoUnit = NO_UNIT.indexOf(ing.unit) >= 0;
-        var p = priceDB.find(function(p){ return p.name===ing.name && p.unit===ing.unit; });
-        var unitCost = (p && p.amount > 0) ? (p.price / p.amount) : null;
-        var qtyN = Math.round(ing.qty1 * persons * 10) / 10;
-        var qtyNDisp = fmtQty(qtyN, ing.unit);
-        var amount = (!isNoUnit && unitCost !== null) ? Math.round(unitCost * ing.qty1 * persons) : null;
-        if (amount !== null) catTotal += amount;
-        var unitPriceDisp = (p && !isNoUnit) ? p.price : '-';
-        catRows.push([
+        var isNoUnit = NO_UNIT.indexOf(ing.unit)>=0;
+        var p = priceDB.find(function(p){return p.name===ing.name&&p.unit===ing.unit;});
+        var unitCost = (p&&p.amount>0)?(p.price/p.amount):null;
+        var qtyN = Math.round(ing.qty1*persons*10)/10;
+        var amount = (!isNoUnit&&unitCost!==null)?Math.round(unitCost*ing.qty1*persons):null;
+        if (amount!==null) catTotal+=amount;
+        catIngRows.push([
           ing.name,
           ing.products.join(', '),
-          isNoUnit ? ing.unit : qtyNDisp,
-          isNoUnit ? '-' : persons,
-          unitPriceDisp,
-          amount !== null ? amount : '-',
+          isNoUnit?ing.unit:fmtQty(qtyN,ing.unit),
+          isNoUnit?'-':persons,
+          (p&&!isNoUnit)?p.price:'-',
+          amount!==null?amount:'-',
           ''
         ]);
       });
@@ -1825,27 +1833,106 @@ function downloadSumExcel() {
       grandTotal += catTotal;
 
       // 카테고리 헤더행
-      wsData.push([cat + ' 재료비', '', '', '', '', '', catTotal]);
-      catRows.forEach(function(r){ wsData.push(r); });
+      addRow([cat+' 재료비','','','','','',catTotal], 'cat');
+      merges.push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:5}});
+      rowIdx++;
+
+      catIngRows.forEach(function(r) {
+        addRow(r, 'data');
+        rowIdx++;
+      });
     });
 
-    // 합계행
-    wsData.push([]);
+    // 총비용
+    addRow(['','','','','','',''], 'empty'); rowIdx++;
+    addRow(['총 비용','','','','','',grandTotal], 'total');
+    merges.push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:5}});
+    rowIdx++;
+
     var grandCut = Math.floor(grandTotal/10)*10;
-    var diff = grandTotal - grandCut;
-    wsData.push(['총 비용', '', '', '', '', '', grandTotal]);
-    wsData.push(['총 금액 (10원 절삭)', '', '', '', '', '', grandCut]);
-    if (diff > 0) wsData.push(['※ ' + diff + '원 절삭']);
+    var diff = grandTotal-grandCut;
+    addRow(['','','','','','',''], 'empty'); rowIdx++;
+    addRow(['금액 :','','','','','',grandTotal], 'sum');
+    merges.push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:5}}); rowIdx++;
+    if (diff>0) {
+      addRow(['※ 10원 단위 절삭 (-'+diff+'원)','','','','','',''], 'note');
+      merges.push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:6}}); rowIdx++;
+    }
+    addRow(['총 금액 :','','','','','',grandCut], 'grandtotal');
+    merges.push({s:{r:rowIdx,c:0},e:{r:rowIdx,c:5}});
 
     var ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!merges'] = merges;
+    ws['!cols'] = [{wch:16},{wch:36},{wch:10},{wch:6},{wch:12},{wch:12},{wch:14}];
 
-    // 열 너비 설정
-    ws['!cols'] = [
-      {wch:16}, {wch:35}, {wch:10}, {wch:6}, {wch:12}, {wch:12}, {wch:14}
-    ];
+    // 행 높이
+    ws['!rows'] = wsData.map(function(r,i){
+      var style = rowStyles[i];
+      if (style==='title') return {hpt:28};
+      if (style==='header'||style==='cat'||style==='total'||style==='grandtotal') return {hpt:20};
+      return {hpt:17};
+    });
+
+    // 셀 스타일 적용
+    var range = XLSX.utils.decode_range(ws['!ref']);
+    for (var R=range.s.r; R<=range.e.r; R++) {
+      var style = rowStyles[R] || 'normal';
+      for (var C=range.s.c; C<=range.e.c; C++) {
+        var addr = XLSX.utils.encode_cell({r:R,c:C});
+        if (!ws[addr]) ws[addr] = {v:'',t:'s'};
+        var base = {
+          border:{
+            top:{style:'thin',color:{rgb:'CCCCCC'}},
+            bottom:{style:'thin',color:{rgb:'CCCCCC'}},
+            left:{style:'thin',color:{rgb:'CCCCCC'}},
+            right:{style:'thin',color:{rgb:'CCCCCC'}}
+          },
+          alignment:{vertical:'center', wrapText:true}
+        };
+        if (style==='title') {
+          base.font={bold:true,sz:14};
+          base.alignment={horizontal:'center',vertical:'center'};
+          base.fill={fgColor:{rgb:'F9F6F1'}};
+          base.border={bottom:{style:'medium',color:{rgb:'C8A97E'}}};
+        } else if (style==='header') {
+          base.font={bold:true,sz:10,color:{rgb:'FFFFFF'}};
+          base.fill={fgColor:{rgb:'2C2C2C'}};
+          base.alignment={horizontal:'center',vertical:'center'};
+          base.border={top:{style:'medium',color:{rgb:'333333'}},bottom:{style:'medium',color:{rgb:'333333'}},left:{style:'thin',color:{rgb:'555555'}},right:{style:'thin',color:{rgb:'555555'}}};
+        } else if (style==='cat') {
+          base.font={bold:true,sz:11};
+          base.fill={fgColor:{rgb:'F5F5F5'}};
+          base.border={top:{style:'thin',color:{rgb:'CCCCCC'}},bottom:{style:'thin',color:{rgb:'CCCCCC'}},left:{style:'thin',color:{rgb:'CCCCCC'}},right:{style:'thin',color:{rgb:'CCCCCC'}}};
+          if (C===6) base.alignment={horizontal:'right',vertical:'center'};
+        } else if (style==='data') {
+          base.font={sz:10};
+          if (C===0) base.font={sz:10,bold:true};
+          if (C===1) base.font={sz:9,color:{rgb:'555555'}};
+          if (C>=2) base.alignment={horizontal:C>=4?'right':'center',vertical:'center'};
+        } else if (style==='total') {
+          base.font={bold:true,sz:12};
+          base.border={top:{style:'medium',color:{rgb:'333333'}},bottom:{style:'medium',color:{rgb:'333333'}},left:{style:'thin',color:{rgb:'CCCCCC'}},right:{style:'thin',color:{rgb:'CCCCCC'}}};
+          if (C===6) base.alignment={horizontal:'right',vertical:'center'};
+        } else if (style==='grandtotal') {
+          base.font={bold:true,sz:13,color:{rgb:'1A5276'}};
+          base.fill={fgColor:{rgb:'EAF3DE'}};
+          base.border={top:{style:'medium',color:{rgb:'333333'}},bottom:{style:'medium',color:{rgb:'333333'}},left:{style:'thin',color:{rgb:'CCCCCC'}},right:{style:'thin',color:{rgb:'CCCCCC'}}};
+          if (C===6) base.alignment={horizontal:'right',vertical:'center'};
+        } else if (style==='note') {
+          base.font={sz:9,color:{rgb:'C0392B'}};
+        } else if (style==='sum') {
+          base.font={sz:11};
+          if (C===6) base.alignment={horizontal:'right',vertical:'center'};
+        } else if (style==='info') {
+          base.font={sz:10};
+          base.border={};
+        }
+        ws[addr].s = base;
+      }
+    }
 
     XLSX.utils.book_append_sheet(wb, ws, '재료합산견적서');
-    XLSX.writeFile(wb, '재료합산견적서_' + (date||'') + '.xlsx');
+    XLSX.writeFile(wb, '재료합산견적서_'+(date||'')+'.xlsx');
     showToast('엑셀 다운로드됐어요!');
   };
   document.head.appendChild(script);
