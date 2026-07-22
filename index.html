@@ -1743,49 +1743,114 @@ function printSumSheet() {
   w.document.close();
 }
 function downloadSumExcel() {
-  var d = getSumData();
-  if (!d) return;
-  var T = String.fromCharCode(9);
-  var N = String.fromCharCode(10);
-  var lines = [];
-  lines.push('퍼스트바리스타제과제빵화성학원 재료 합산 견적서');
-  lines.push('제출처: ' + d.target + T + '날짜: ' + d.date + (d.persons > 1 ? T + '기준: ' + d.persons + d.pUnit : ''));
-  lines.push('대상 제품: ' + d.selectedRecipes.map(function(r){ return r.name; }).join(', '));
-  lines.push('');
-  var hdr = ['재료명', '사용 제품', '1인 용량'];
-  if (d.persons > 1) hdr.push(d.persons + d.pUnit + ' 용량');
-  hdr.push('단가', '1인 금액');
-  if (d.persons > 1) hdr.push(d.persons + d.pUnit + ' 금액');
-  lines.push(hdr.join(T));
-  d.rows.forEach(function(row) {
-    var qty1Str = row.isNoUnit ? row.unit : String(row.qty1) + row.unit;
-    var qtyNStr = row.isNoUnit ? row.unit : String(row.qtyN) + row.unit;
-    var r = [row.name, row.products.join('/'), qty1Str];
-    if (d.persons > 1) r.push(qtyNStr);
-    r.push(row.unitPrice !== null ? row.unitPrice.toFixed(1) : '-');
-    r.push(row.cost1 !== null ? String(row.cost1) : '-');
-    if (d.persons > 1) r.push(row.costN !== null ? String(row.costN) : '-');
-    lines.push(r.join(T));
+  var target = document.getElementById('sum-target').value.trim() || '';
+  var date = document.getElementById('sum-date').value;
+  var persons = parseInt(document.getElementById('sum-persons').value) || 1;
+  var pUnit = document.getElementById('sum-unit').value;
+
+  var checkedIds = [];
+  document.querySelectorAll('.sum-chk:checked').forEach(function(cb){ checkedIds.push(cb.value); });
+  if (!checkedIds.length) { showToast('제품을 1개 이상 선택해 주세요'); return; }
+  var selectedRecipes = recipes.filter(function(r){ return checkedIds.indexOf(String(r.id)) >= 0; });
+
+  var catMap = {};
+  var catOrder = [];
+  selectedRecipes.forEach(function(r) {
+    if (!catMap[r.cat]) { catMap[r.cat] = []; catOrder.push(r.cat); }
+    catMap[r.cat].push(r);
   });
-  lines.push('');
-  lines.push('합계(절삭 전)' + T + String(d.totalCost) + '원');
-  lines.push('합계(10원 절삭)' + T + String(d.totalCostCut) + '원');
-  if (d.persons > 1) {
-    lines.push(d.persons + d.pUnit + ' 합계(절삭 전)' + T + String(d.totalCost) + '원');
-    lines.push(d.persons + d.pUnit + ' 합계(10원 절삭)' + T + String(d.totalCostCut) + '원');
+
+  function fmtQty(qty, unit) {
+    if (NO_UNIT.indexOf(unit) >= 0) return unit;
+    if (unit === 'g' && qty >= 1000) return (Math.round(qty/100)/10) + 'kg';
+    if (unit === 'ml' && qty >= 1000) return (Math.round(qty/100)/10) + 'L';
+    return qty + unit;
   }
-  var bom = '﻿';
-  var blob = new Blob([bom + lines.join(N)], {type: 'text/plain;charset=utf-8'});
-  var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = '재료합산견적서_' + (d.date||'') + '.xls';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('엑셀 다운로드됐어요!');
+
+  // SheetJS로 엑셀 생성
+  var script = document.createElement('script');
+  script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  script.onload = function() {
+    var wb = XLSX.utils.book_new();
+    var wsData = [];
+
+    // 제목행
+    wsData.push(['퍼스트바리스타제과제빵화성학원 재료비 견적서']);
+    wsData.push(['견적일: ' + date, '', '제출처: ' + target, '', '기준: ' + persons + pUnit]);
+    wsData.push(['대상 제품: ' + selectedRecipes.map(function(r){return r.name;}).join(', ')]);
+    wsData.push([]);
+
+    // 헤더
+    wsData.push(['재료', '제품 종류', '수량', '인원', '단가(원)', '금액(원)', '카테고리 소계(원)']);
+
+    var grandTotal = 0;
+
+    catOrder.forEach(function(cat) {
+      var catRecipes = catMap[cat];
+      var ingMap = {};
+      var ingOrder = [];
+      catRecipes.forEach(function(r) {
+        getAllIngs(r).forEach(function(ing) {
+          var key = ing.name + '__' + ing.unit;
+          if (!ingMap[key]) { ingMap[key] = {name:ing.name, unit:ing.unit, qty1:0, products:[]}; ingOrder.push(key); }
+          ingMap[key].qty1 += ing.qty;
+          if (ingMap[key].products.indexOf(r.name) < 0) ingMap[key].products.push(r.name);
+        });
+      });
+
+      var catTotal = 0;
+      var catRows = [];
+
+      ingOrder.forEach(function(key) {
+        var ing = ingMap[key];
+        var isNoUnit = NO_UNIT.indexOf(ing.unit) >= 0;
+        var p = priceDB.find(function(p){ return p.name===ing.name && p.unit===ing.unit; });
+        var unitCost = (p && p.amount > 0) ? (p.price / p.amount) : null;
+        var qtyN = Math.round(ing.qty1 * persons * 10) / 10;
+        var qtyNDisp = fmtQty(qtyN, ing.unit);
+        var amount = (!isNoUnit && unitCost !== null) ? Math.round(unitCost * ing.qty1 * persons) : null;
+        if (amount !== null) catTotal += amount;
+        var unitPriceDisp = (p && !isNoUnit) ? p.price : '-';
+        catRows.push([
+          ing.name,
+          ing.products.join(', '),
+          isNoUnit ? ing.unit : qtyNDisp,
+          isNoUnit ? '-' : persons,
+          unitPriceDisp,
+          amount !== null ? amount : '-',
+          ''
+        ]);
+      });
+
+      grandTotal += catTotal;
+
+      // 카테고리 헤더행
+      wsData.push([cat + ' 재료비', '', '', '', '', '', catTotal]);
+      catRows.forEach(function(r){ wsData.push(r); });
+    });
+
+    // 합계행
+    wsData.push([]);
+    var grandCut = Math.floor(grandTotal/10)*10;
+    var diff = grandTotal - grandCut;
+    wsData.push(['총 비용', '', '', '', '', '', grandTotal]);
+    wsData.push(['총 금액 (10원 절삭)', '', '', '', '', '', grandCut]);
+    if (diff > 0) wsData.push(['※ ' + diff + '원 절삭']);
+
+    var ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // 열 너비 설정
+    ws['!cols'] = [
+      {wch:16}, {wch:35}, {wch:10}, {wch:6}, {wch:12}, {wch:12}, {wch:14}
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, '재료합산견적서');
+    XLSX.writeFile(wb, '재료합산견적서_' + (date||'') + '.xlsx');
+    showToast('엑셀 다운로드됐어요!');
+  };
+  document.head.appendChild(script);
 }
+
 
 window.onload = function(){ loadAll(); };
 </script>
