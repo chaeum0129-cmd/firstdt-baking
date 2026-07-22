@@ -163,6 +163,7 @@ button:active{transform:scale(.98)}
       <div style="display:flex;gap:6px">
         <button onclick="openCatModal()" class="btn-sm">📂 카테고리 관리</button>
         <button onclick="openCostPrintModal()" class="btn-sm">📄 재료비 명세서</button>
+        <button onclick="openSumModal()" class="btn-sm">📊 재료 합산 견적서</button>
         <button onclick="printAllRecipes()" class="btn-sm">🖨️ 전체 인쇄</button>
         <button class="btn-primary" onclick="openRecipeModal(null)">+ 레시피 등록</button>
       </div>
@@ -342,6 +343,55 @@ button:active{transform:scale(.98)}
       <button onclick="closeCostPrintModal()">취소</button>
       <button class="btn-sm" onclick="downloadCostExcel()">📊 엑셀 다운로드</button>
       <button class="btn-primary" onclick="printCostSheet()">🖨️ 인쇄</button>
+    </div>
+  </div>
+</div>
+<!-- 재료 합산 견적서 모달 -->
+<div class="modal-bg" id="sum-modal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">📊 재료 합산 견적서</div>
+      <button class="close-btn" onclick="closeSumModal()">✕</button>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>제출처 (기관명/업체명)</label>
+      <input type="text" id="sum-target" placeholder="예: ○○기관">
+    </div>
+    <div style="margin-bottom:12px">
+      <label>날짜</label>
+      <input type="date" id="sum-date">
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <div style="flex:2">
+        <label>수량 기준</label>
+        <input type="number" id="sum-persons" placeholder="예: 10 (미입력시 1인)" min="1">
+      </div>
+      <div style="flex:1">
+        <label>단위</label>
+        <select id="sum-unit">
+          <option value="인">인</option>
+          <option value="조">조</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>카테고리</label>
+      <select id="sum-cat" onchange="renderSumRecipeList()">
+        <option value="">전체 카테고리</option>
+      </select>
+    </div>
+    <div style="margin-bottom:12px">
+      <label>제품 선택</label>
+      <div style="display:flex;gap:6px;margin-bottom:6px">
+        <button class="btn-sm" onclick="selectAllSum()">전체 선택</button>
+        <button class="btn-sm" onclick="deselectAllSum()">전체 해제</button>
+      </div>
+      <div id="sum-recipe-list" style="max-height:180px;overflow-y:auto;border:1px solid #e5e4e0;border-radius:8px;padding:8px"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="closeSumModal()">취소</button>
+      <button class="btn-sm" onclick="downloadSumExcel()">📊 엑셀</button>
+      <button class="btn-primary" onclick="printSumSheet()">🖨️ 인쇄</button>
     </div>
   </div>
 </div>
@@ -1490,6 +1540,191 @@ function switchTab(t) {
   if (t === 'history') loadHistory();
   if (t === 'price') { renderPriceList(); renderIngList(); }
   if (t === 'recipe') renderRecipes();
+}
+
+
+// ── 재료 합산 견적서 ──
+function openSumModal() {
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById('sum-date').value = today;
+  document.getElementById('sum-target').value = '';
+  document.getElementById('sum-persons').value = '';
+  var catSel = document.getElementById('sum-cat');
+  catSel.innerHTML = '<option value="">전체 카테고리</option>' +
+    CATS.map(function(c){ return '<option>'+c+'</option>'; }).join('');
+  renderSumRecipeList();
+  document.getElementById('sum-modal').classList.add('open');
+}
+function closeSumModal() { document.getElementById('sum-modal').classList.remove('open'); }
+
+function renderSumRecipeList() {
+  var fc = document.getElementById('sum-cat').value;
+  var list = fc ? recipes.filter(function(r){ return r.cat===fc; }) : recipes;
+  var el = document.getElementById('sum-recipe-list');
+  if (!list.length) { el.innerHTML = '<div style="text-align:center;color:#aaa;padding:1rem;font-size:13px">레시피가 없습니다</div>'; return; }
+  el.innerHTML = list.map(function(r) {
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer;font-size:13px">' +
+      '<input type="checkbox" checked class="sum-chk" value="' + r.id + '" style="width:auto"> ' +
+      '<span>' + r.name + '</span>' +
+      '<span class="badge ' + (CAT_CLS[r.cat]||'b-teal') + '" style="font-size:10px">' + r.cat + '</span>' +
+      '</label>';
+  }).join('');
+}
+function selectAllSum() { document.querySelectorAll('.sum-chk').forEach(function(c){ c.checked=true; }); }
+function deselectAllSum() { document.querySelectorAll('.sum-chk').forEach(function(c){ c.checked=false; }); }
+
+function getSumData() {
+  var checkedIds = [];
+  document.querySelectorAll('.sum-chk:checked').forEach(function(cb){ checkedIds.push(cb.value); });
+  if (!checkedIds.length) { showToast('제품을 1개 이상 선택해 주세요'); return null; }
+  var selectedRecipes = recipes.filter(function(r){ return checkedIds.indexOf(String(r.id)) >= 0; });
+  var persons = parseInt(document.getElementById('sum-persons').value) || 1;
+  var pUnit = document.getElementById('sum-unit').value;
+
+  // 재료별 합산
+  var ingMap = {};
+  selectedRecipes.forEach(function(r) {
+    getAllIngs(r).forEach(function(ing) {
+      var key = ing.name + '__' + ing.unit;
+      if (!ingMap[key]) ingMap[key] = {name:ing.name, unit:ing.unit, qty1:0, products:[]};
+      ingMap[key].qty1 += ing.qty;
+      if (ingMap[key].products.indexOf(r.name) < 0) ingMap[key].products.push(r.name);
+    });
+  });
+
+  var rows = Object.values(ingMap).sort(function(a,b){ return a.name.localeCompare(b.name,'ko'); });
+  var totalCost = 0;
+  rows.forEach(function(row) {
+    var isNoUnit = NO_UNIT.indexOf(row.unit) >= 0;
+    var p = priceDB.find(function(p){ return p.name===row.name && p.unit===row.unit; });
+    row.unitPrice = (p && p.amount > 0) ? (p.price / p.amount) : null;
+    row.qtyN = Math.round(row.qty1 * persons * 10) / 10;
+    row.cost1 = (!isNoUnit && row.unitPrice !== null) ? Math.round(row.unitPrice * row.qty1) : null;
+    row.costN = (!isNoUnit && row.unitPrice !== null) ? Math.round(row.unitPrice * row.qty1 * persons) : null;
+    if (row.costN !== null) totalCost += row.costN;
+    row.isNoUnit = isNoUnit;
+  });
+
+  return {
+    rows: rows,
+    persons: persons,
+    pUnit: pUnit,
+    totalCost: totalCost,
+    totalCostCut: Math.floor(totalCost / 10) * 10,
+    target: document.getElementById('sum-target').value.trim() || '',
+    date: document.getElementById('sum-date').value,
+    selectedRecipes: selectedRecipes
+  };
+}
+
+function printSumSheet() {
+  var d = getSumData();
+  if (!d) return;
+  var dateStr = d.date ? new Date(d.date).toLocaleDateString('ko-KR', {year:'numeric',month:'long',day:'numeric'}) : '';
+  var colSpan = d.persons > 1 ? 7 : 5;
+
+  var tableRows = d.rows.map(function(row) {
+    var qty1Str = row.isNoUnit ? row.unit : row.qty1 + row.unit;
+    var qtyNStr = row.isNoUnit ? row.unit : row.qtyN + row.unit;
+    var unitPriceStr = row.unitPrice !== null ? row.unitPrice.toFixed(1) + '원/' + row.unit : '-';
+    var cost1Str = row.cost1 !== null ? row.cost1.toLocaleString() + '원' : '-';
+    var costNStr = row.costN !== null ? row.costN.toLocaleString() + '원' : '-';
+    var prodStr = row.products.join(', ');
+    return '<tr>' +
+      '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;font-weight:500">' + row.name + '</td>' +
+      '<td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;color:#666">' + prodStr + '</td>' +
+      '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;text-align:center">' + qty1Str + '</td>' +
+      (d.persons > 1 ? '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;text-align:center;color:#085041;font-weight:500">' + qtyNStr + '</td>' : '') +
+      '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;text-align:right">' + unitPriceStr + '</td>' +
+      '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;text-align:right">' + cost1Str + '</td>' +
+      (d.persons > 1 ? '<td style="padding:5px 8px;border:1px solid #ddd;font-size:11px;text-align:right;font-weight:600;color:#085041">' + costNStr + '</td>' : '') +
+      '</tr>';
+  }).join('');
+
+  var productNames = d.selectedRecipes.map(function(r){ return r.name; }).join(', ');
+  var diff = d.totalCost - d.totalCostCut;
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>재료 합산 견적서</title>' +
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:sans-serif;color:#2c2c2c;padding:20px 24px}' +
+    '@media print{@page{size:A4 portrait;margin:15mm}body{padding:0}}</style></head><body>' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;border-bottom:2px solid #c8a97e;margin-bottom:16px">' +
+    '<img src="' + LOGO + '" style="height:50px;object-fit:contain">' +
+    '<div style="text-align:right">' +
+    '<div style="font-size:18px;font-weight:700;margin-bottom:4px">재료 합산 견적서</div>' +
+    '<div style="font-size:11px;color:#666">제출처: <b>' + (d.target||'　') + '</b></div>' +
+    '<div style="font-size:11px;color:#666;margin-top:2px">' + dateStr + '</div>' +
+    (d.persons > 1 ? '<div style="font-size:11px;color:#085041;font-weight:500;margin-top:2px">기준: <b>' + d.persons + d.pUnit + '</b></div>' : '') +
+    '</div></div>' +
+    '<div style="font-size:11px;color:#666;margin-bottom:10px;padding:6px 10px;background:#f9f6f1;border-radius:6px">대상 제품: ' + productNames + '</div>' +
+    '<table style="width:100%;border-collapse:collapse;margin-bottom:14px">' +
+    '<thead><tr style="background:#f5f4f0">' +
+    '<th style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:left">재료명</th>' +
+    '<th style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:left">사용 제품</th>' +
+    '<th style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:center">1인 용량</th>' +
+    (d.persons > 1 ? '<th style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:center">' + d.persons + d.pUnit + ' 용량</th>' : '') +
+    '<th style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:right">단가</th>' +
+    '<th style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:right">1인 금액</th>' +
+    (d.persons > 1 ? '<th style="padding:6px 8px;border:1px solid #ddd;font-size:11px;text-align:right">' + d.persons + d.pUnit + ' 금액</th>' : '') +
+    '</tr></thead><tbody>' + tableRows + '</tbody></table>' +
+    '<div style="padding:10px 14px;background:#f9f6f1;border-radius:8px;border:1px solid #e0d5c5">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+    '<span style="font-size:13px;font-weight:700">합계 (' + d.selectedRecipes.length + '개 제품)</span>' +
+    '<div style="text-align:right">' +
+    '<div style="font-size:12px;color:#666">합계(절삭 전): ' + d.totalCost.toLocaleString() + '원</div>' +
+    '<div style="font-size:15px;font-weight:700;color:#085041">합계(10원 절삭): ' + d.totalCostCut.toLocaleString() + '원</div>' +
+    (diff > 0 ? '<div style="font-size:10px;color:#c0392b">※ ' + diff + '원 절삭</div>' : '') +
+    '</div></div></div>' +
+    '<div style="margin-top:14px;padding-top:8px;border-top:1px solid #e5e4e0;text-align:center;font-size:10px;color:#bbb">퍼스트바리스타제과제빵화성학원</div>' +
+    '<script>window.onload=function(){window.print();};<\/script></body></html>';
+
+  var w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+function downloadSumExcel() {
+  var d = getSumData();
+  if (!d) return;
+  var T = String.fromCharCode(9);
+  var N = String.fromCharCode(10);
+  var lines = [];
+  lines.push('퍼스트바리스타제과제빵화성학원 재료 합산 견적서');
+  lines.push('제출처: ' + d.target + T + '날짜: ' + d.date + (d.persons > 1 ? T + '기준: ' + d.persons + d.pUnit : ''));
+  lines.push('대상 제품: ' + d.selectedRecipes.map(function(r){ return r.name; }).join(', '));
+  lines.push('');
+  var hdr = ['재료명', '사용 제품', '1인 용량'];
+  if (d.persons > 1) hdr.push(d.persons + d.pUnit + ' 용량');
+  hdr.push('단가', '1인 금액');
+  if (d.persons > 1) hdr.push(d.persons + d.pUnit + ' 금액');
+  lines.push(hdr.join(T));
+  d.rows.forEach(function(row) {
+    var qty1Str = row.isNoUnit ? row.unit : String(row.qty1) + row.unit;
+    var qtyNStr = row.isNoUnit ? row.unit : String(row.qtyN) + row.unit;
+    var r = [row.name, row.products.join('/'), qty1Str];
+    if (d.persons > 1) r.push(qtyNStr);
+    r.push(row.unitPrice !== null ? row.unitPrice.toFixed(1) : '-');
+    r.push(row.cost1 !== null ? String(row.cost1) : '-');
+    if (d.persons > 1) r.push(row.costN !== null ? String(row.costN) : '-');
+    lines.push(r.join(T));
+  });
+  lines.push('');
+  lines.push('합계(절삭 전)' + T + String(d.totalCost) + '원');
+  lines.push('합계(10원 절삭)' + T + String(d.totalCostCut) + '원');
+  if (d.persons > 1) {
+    lines.push(d.persons + d.pUnit + ' 합계(절삭 전)' + T + String(d.totalCost) + '원');
+    lines.push(d.persons + d.pUnit + ' 합계(10원 절삭)' + T + String(d.totalCostCut) + '원');
+  }
+  var bom = '﻿';
+  var blob = new Blob([bom + lines.join(N)], {type: 'text/plain;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = '재료합산견적서_' + (d.date||'') + '.xls';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('엑셀 다운로드됐어요!');
 }
 
 window.onload = function(){ loadAll(); };
