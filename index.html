@@ -203,6 +203,7 @@ button:active{transform:scale(.98)}
         <div style="flex:1;min-width:80px"><label>단가 (원)</label><input type="number" id="pi-price" placeholder="예: 2800"></div>
         <div style="display:flex;align-items:flex-end">
           <button class="btn-primary" onclick="addPriceItem()">+ 등록</button>
+        <button id="price-edit-cancel" class="btn-sm btn-danger" onclick="cancelPriceEdit()" style="display:none">취소</button>
         </div>
       </div>
       <div style="font-size:12px;color:#888">※ 용량과 단위는 구매 단위 기준 (예: 박력분 1000g = 2,800원)</div>
@@ -1224,23 +1225,41 @@ function addPriceItem() {
   showToast('등록됐어요!');
 }
 
+var _editingPriceIdx = null;
+
 function editPriceItem(i) {
   checkPw(function() {
+    // 이전에 수정 중인 항목 있으면 원복
+    if (_editingPriceIdx !== null && priceDB[_editingPriceIdx]) {
+      // 그냥 폼만 교체 (삭제 안함)
+    }
     var item = priceDB[i];
     if (!item) return;
+    _editingPriceIdx = i;
     document.getElementById('pi-name').value = item.name;
     document.getElementById('pi-amount').value = item.amount;
     document.getElementById('pi-unit').value = item.unit;
     document.getElementById('pi-price').value = item.price;
-    // 수정 모드: 기존 항목 삭제 후 새로 저장
-    priceDB.splice(i, 1);
-    savePriceDB();
-    renderPriceList();
-    renderIngList();
-    renderRecipes();
+    // 수정 중 표시
+    var addBtn = document.querySelector('[onclick="addPriceItem()"]');
+    if (addBtn) { addBtn.textContent = '수정 완료'; addBtn.style.background = '#085041'; }
+    var cancelBtn = document.getElementById('price-edit-cancel');
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
     document.getElementById('pi-name').focus();
-    showToast('수정할 내용을 변경 후 등록 버튼을 눌러주세요');
+    showToast(item.name + ' 수정 중... 변경 후 수정 완료를 눌러주세요');
   });
+}
+
+function cancelPriceEdit() {
+  _editingPriceIdx = null;
+  document.getElementById('pi-name').value = '';
+  document.getElementById('pi-amount').value = '';
+  document.getElementById('pi-price').value = '';
+  var addBtn = document.querySelector('[onclick="addPriceItem()"]');
+  if (addBtn) { addBtn.textContent = '+ 등록'; addBtn.style.background = ''; }
+  var cancelBtn = document.getElementById('price-edit-cancel');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  showToast('수정이 취소됐어요');
 }
 
 function deletePriceItem(i) {
@@ -1942,6 +1961,86 @@ function downloadSumExcel() {
   document.head.appendChild(script);
 }
 
+
+
+// ── 전체 재료 목록 ──
+function renderIngList() {
+  var el = document.getElementById('ing-list-wrap');
+  if (!el) return;
+  el.innerHTML = '';
+
+  var ingMap = {};
+  recipes.forEach(function(r) {
+    getAllIngs(r).forEach(function(ing) {
+      var key = ing.name + '__' + ing.unit;
+      if (!ingMap[key]) ingMap[key] = {name:ing.name, unit:ing.unit, usedIn:[]};
+      if (ingMap[key].usedIn.indexOf(r.name) < 0) ingMap[key].usedIn.push(r.name);
+    });
+  });
+
+  var allIngs = Object.values(ingMap).sort(function(a,b){ return a.name.localeCompare(b.name,'ko'); });
+  var q = document.getElementById('ing-list-search') ? (document.getElementById('ing-list-search').value||'').toLowerCase() : '';
+  if (q) allIngs = allIngs.filter(function(i){ return i.name.toLowerCase().includes(q); });
+
+  if (!allIngs.length) {
+    el.innerHTML = '<div style="text-align:center;color:#aaa;padding:1rem;font-size:13px">' + (recipes.length ? '검색 결과가 없습니다' : '등록된 레시피가 없습니다') + '</div>';
+    return;
+  }
+
+  var withPrice = allIngs.filter(function(i){ return priceDB.find(function(p){ return p.name===i.name&&p.unit===i.unit; }); });
+  var noPrice   = allIngs.filter(function(i){ return !priceDB.find(function(p){ return p.name===i.name&&p.unit===i.unit; }); });
+
+  var summary = document.createElement('div');
+  summary.style.cssText = 'font-size:12px;color:#666;margin-bottom:8px';
+  summary.innerHTML = '총 <b>' + allIngs.length + '가지</b> 재료 · 단가 등록 <b style="color:#27500a">' + withPrice.length + '가지</b> · 미등록 <b style="color:#c0392b">' + noPrice.length + '가지</b>';
+  el.appendChild(summary);
+
+  if (noPrice.length) {
+    var label1 = document.createElement('div');
+    label1.style.cssText = 'font-size:12px;font-weight:500;color:#666;margin-bottom:5px';
+    label1.textContent = '⚠️ 단가 미등록';
+    el.appendChild(label1);
+    var grid1 = document.createElement('div');
+    grid1.className = 'ing-list-grid';
+    grid1.style.marginBottom = '10px';
+    noPrice.forEach(function(i) {
+      var tip = i.usedIn.slice(0,3).join(', ') + (i.usedIn.length > 3 ? ' 외 ' + (i.usedIn.length-3) + '개' : '');
+      var span = document.createElement('span');
+      span.className = 'ing-list-item no-price';
+      span.title = '사용 레시피: ' + tip;
+      span.innerHTML = i.name + ' <span style="font-size:10px;color:#888">('+i.unit+')</span>';
+      span.addEventListener('click', (function(n,u){ return function(){ fillPriceForm(n,u); }; })(i.name, i.unit));
+      grid1.appendChild(span);
+    });
+    el.appendChild(grid1);
+  }
+
+  if (withPrice.length) {
+    var label2 = document.createElement('div');
+    label2.style.cssText = 'font-size:12px;font-weight:500;color:#27500a;margin-bottom:5px';
+    label2.textContent = '✅ 단가 등록 완료';
+    el.appendChild(label2);
+    var grid2 = document.createElement('div');
+    grid2.className = 'ing-list-grid';
+    withPrice.forEach(function(i) {
+      var p = priceDB.find(function(p){ return p.name===i.name&&p.unit===i.unit; });
+      var tip = i.usedIn.slice(0,3).join(', ') + (i.usedIn.length > 3 ? ' 외 ' + (i.usedIn.length-3) + '개' : '');
+      var span = document.createElement('span');
+      span.className = 'ing-list-item has-price';
+      span.title = '사용 레시피: ' + tip;
+      span.innerHTML = i.name + ' <span style="font-size:10px;opacity:.8">' + p.price.toLocaleString() + '원/' + p.amount + p.unit + '</span>';
+      grid2.appendChild(span);
+    });
+    el.appendChild(grid2);
+  }
+}
+
+function fillPriceForm(name, unit) {
+  document.getElementById('pi-name').value = name;
+  document.getElementById('pi-unit').value = unit;
+  document.getElementById('pi-amount').focus();
+  showToast(name + ' 단가를 입력해 주세요!');
+}
 
 window.onload = function(){ loadAll(); };
 </script>
