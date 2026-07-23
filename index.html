@@ -1673,6 +1673,7 @@ function printSumSheet() {
       // 단가: 원/단위 없이 금액만 표시
       var unitPriceDisp = (p && !isNoUnit) ? p.price.toLocaleString() + '원' : '-';
 
+      var weightDisp = (p && !isNoUnit) ? fmtQty(p.amount, p.unit) : '-';
       ingRows +=
         '<tr>' +
         '<td style="padding:5px 8px 5px 20px;border-bottom:1px solid #eee;font-size:11px">' + ing.name + '</td>' +
@@ -1680,6 +1681,7 @@ function printSumSheet() {
         '<td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;text-align:center">' + (isNoUnit ? '-' : qtyNDisp) + '</td>' +
         '<td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;text-align:center">' + (isNoUnit ? '-' : String(persons)) + '</td>' +
         '<td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;text-align:right">' + unitPriceDisp + '</td>' +
+        '<td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;text-align:center">' + weightDisp + '</td>' +
         '<td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;text-align:right">' + (amount !== null ? amount.toLocaleString() + '원' : '-') + '</td>' +
         '<td style="padding:5px 8px;border-bottom:1px solid #eee;font-size:11px;"></td>' +
         '</tr>';
@@ -1712,18 +1714,19 @@ function printSumSheet() {
     '<table>' +
     '<thead>' +
     '<tr style="border-top:2px solid #333;border-bottom:1px solid #333">' +
-    '<th style="padding:6px 8px;text-align:left;font-size:11px;width:13%">재료</th>' +
-    '<th style="padding:6px 8px;text-align:left;font-size:11px;width:28%">제품 종류</th>' +
-    '<th style="padding:6px 8px;text-align:center;font-size:11px;width:11%">수량</th>' +
-    '<th style="padding:6px 8px;text-align:center;font-size:11px;width:8%">인원</th>' +
-    '<th style="padding:6px 8px;text-align:right;font-size:11px;width:14%">단가</th>' +
-    '<th style="padding:6px 8px;text-align:right;font-size:11px;width:13%">금액</th>' +
-    '<th style="padding:6px 8px;text-align:right;font-size:11px;width:13%">총금액</th>' +
+    '<th style="padding:6px 8px;text-align:left;font-size:11px;width:12%">재료</th>' +
+    '<th style="padding:6px 8px;text-align:left;font-size:11px;width:24%">제품 종류</th>' +
+    '<th style="padding:6px 8px;text-align:center;font-size:11px;width:9%">수량</th>' +
+    '<th style="padding:6px 8px;text-align:center;font-size:11px;width:6%">인원</th>' +
+    '<th style="padding:6px 8px;text-align:right;font-size:11px;width:12%">단가</th>' +
+    '<th style="padding:6px 8px;text-align:center;font-size:11px;width:9%">무게</th>' +
+    '<th style="padding:6px 8px;text-align:right;font-size:11px;width:11%">금액</th>' +
+    '<th style="padding:6px 8px;text-align:right;font-size:11px;width:11%">총금액</th>' +
     '</tr>' +
     '</thead>' +
     '<tbody>' + bodyHtml +
     '<tr style="border-top:2px solid #333;border-bottom:1px solid #333">' +
-    '<td colspan="6" style="padding:7px 10px;font-size:13px;font-weight:700">총 비용</td>' +
+    '<td colspan="7" style="padding:7px 10px;font-size:13px;font-weight:700">총 비용</td>' +
     '<td style="padding:7px 10px;font-size:13px;font-weight:700;text-align:right">' + grandTotal.toLocaleString() + '원</td>' +
     '</tr></tbody></table>' +
 
@@ -1819,12 +1822,14 @@ function downloadSumExcel() {
         var qtyN = Math.round(ing.qty1*persons*10)/10;
         var amount = (!isNoUnit&&unitCost!==null)?Math.round(unitCost*ing.qty1*persons):null;
         if (amount!==null) catTotal+=amount;
+        var wDisp = (p&&!isNoUnit)?fmtQty(p.amount,p.unit):'-';
         catIngRows.push([
           ing.name,
           ing.products.join(', '),
           isNoUnit?ing.unit:fmtQty(qtyN,ing.unit),
           isNoUnit?'-':persons,
           (p&&!isNoUnit)?p.price:'-',
+          wDisp,
           amount!==null?amount:'-',
           ''
         ]);
@@ -1863,7 +1868,7 @@ function downloadSumExcel() {
 
     var ws = XLSX.utils.aoa_to_sheet(wsData);
     ws['!merges'] = merges;
-    ws['!cols'] = [{wch:16},{wch:36},{wch:10},{wch:6},{wch:12},{wch:12},{wch:14}];
+    ws['!cols'] = [{wch:16},{wch:32},{wch:10},{wch:6},{wch:12},{wch:8},{wch:12},{wch:14}];
 
     // 행 높이
     ws['!rows'] = wsData.map(function(r,i){
