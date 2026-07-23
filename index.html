@@ -7,7 +7,8 @@
 <!-- 엑셀 다운로드 및 스타일 적용을 위한 라이브러리 추가 -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-<style>*{box-sizing:border-box;margin:0;padding:0}
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans KR',sans-serif;font-size:14px;background:#f5f4f0;color:#1a1a18;min-height:100vh}
 header{background:#fff;border-bottom:1px solid #e5e4e0;padding:0 1rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:50}
 .logo{font-size:16px;font-weight:600}.logo span{font-size:12px;font-weight:400;color:#888;margin-left:6px}
@@ -85,7 +86,8 @@ button:active{transform:scale(.98)}
 .ing-list-item:hover{opacity:.8}
 .price-tag{display:inline-block;background:#e8f4fd;border:1px solid #b3d9f7;border-radius:6px;padding:2px 8px;font-size:12px;color:#1a5276;font-weight:500}
 .cost-badge{display:inline-block;background:#eaf3de;border:1px solid #b5d89a;border-radius:6px;padding:2px 8px;font-size:12px;color:#27500a;font-weight:500}
-.temp-box{background:#fff8f0;border:1px solid #f0d8b0;border-radius:8px;padding:8px 14px;font-size:13px;margin-bottom:6px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}</style>
+.temp-box{background:#fff8f0;border:1px solid #f0d8b0;border-radius:8px;padding:8px 14px;font-size:13px;margin-bottom:6px;display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+</style>
 </head>
 <body>
 <header>
@@ -97,6 +99,7 @@ button:active{transform:scale(.98)}
     <button class="nav-btn" onclick="switchTab('price')">재료단가</button>
   </nav>
 </header>
+
 <div class="main">
   <!-- 수업계획 -->
   <div id="tab-plan" style="display:block">
@@ -152,6 +155,7 @@ button:active{transform:scale(.98)}
       </div>
     </div>
   </div>
+
   <!-- 레시피 -->
   <div id="tab-recipe" style="display:none">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
@@ -171,6 +175,7 @@ button:active{transform:scale(.98)}
     </div>
     <div id="recipe-list"></div>
   </div>
+
   <!-- 발주이력 -->
   <div id="tab-history" style="display:none">
     <div id="history-list"></div>
@@ -402,11 +407,984 @@ button:active{transform:scale(.98)}
 <script>
 var API_URL = 'https://script.google.com/macros/s/AKfycbygIviI2Jpl3q6TYcjrwXpcCld6N_tHwoR33Dw3FTdr3ZeG9GyQnbM-qGq5gJzjI5fR/exec';
 
+var recipes = [];
+var history = [];
+var priceMaster = [];
+var categories = ['제과기능사','제빵기능사','홈베이커리','채식베이커리','디저트','기타'];
+var planItems = [];
+var selectedRecipeId = null;
+var currentEditId = null;
+var currentDetailRecipe = null;
+
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.innerText = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2500);
+}
+
+function switchTab(tab) {
+  ['plan','recipe','history','price'].forEach(function(t) {
+    document.getElementById('tab-' + t).style.display = (t === tab) ? 'block' : 'none';
+  });
+  document.querySelectorAll('.nav-btn').forEach(function(b, idx) {
+    b.classList.toggle('active', ['plan','recipe','history','price'][idx] === tab);
+  });
+  if (tab === 'price') renderIngList();
+}
+
+function convertGDriveUrl(url) {
+  if (!url) return '';
+  var m = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (m) return 'https://lh3.googleusercontent.com/d/' + m[1];
+  m = url.match(/id=([a-zA-Z0-9_-]+)/);
+  if (m) return 'https://lh3.googleusercontent.com/d/' + m[1];
+  return url;
+}
+
+function loadData() {
+  fetch(API_URL + '?action=getRecipes')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      recipes = data || [];
+      renderPlanPicker();
+      renderRecipes();
+      updateCategoryDropdowns();
+    })
+    .catch(function(e){ console.error(e); });
+
+  fetch(API_URL + '?action=getHistory')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      history = data || [];
+      renderHistory();
+    })
+    .catch(function(e){ console.error(e); });
+
+  fetch(API_URL + '?action=getPrices')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      priceMaster = data || [];
+      renderPriceList();
+    })
+    .catch(function(e){ console.error(e); });
+
+  fetch(API_URL + '?action=getCategories')
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data && data.length > 0) categories = data;
+      updateCategoryDropdowns();
+    })
+    .catch(function(e){ console.error(e); });
+}
+
+function updateCategoryDropdowns() {
+  var filterCat = document.getElementById('recipe-filter-cat');
+  var costCat = document.getElementById('cost-cat-filter');
+  var sumCat = document.getElementById('sum-cat');
+  var rCat = document.getElementById('r-cat');
+  
+  var prevFilter = filterCat.value;
+  filterCat.innerHTML = '<option value="">전체 카테고리</option>';
+  costCat.innerHTML = '<option value="">전체 카테고리</option>';
+  sumCat.innerHTML = '<option value="">전체 카테고리</option>';
+  rCat.innerHTML = '';
+
+  categories.forEach(function(c) {
+    filterCat.innerHTML += '<option value="'+c+'">'+c+'</option>';
+    costCat.innerHTML += '<option value="'+c+'">'+c+'</option>';
+    sumCat.innerHTML += '<option value="'+c+'">'+c+'</option>';
+    rCat.innerHTML += '<option value="'+c+'">'+c+'</option>';
+  });
+  filterCat.value = prevFilter;
+}
+
+// ---------------- 수업계획 ----------------
+function renderPlanPicker() {
+  var cat = document.getElementById('plan-cat-filter').value;
+  var search = document.getElementById('plan-search').value.toLowerCase();
+  var filtered = recipes.filter(function(r) {
+    var matchCat = !cat || r.category === cat;
+    var matchSearch = !search || r.name.toLowerCase().includes(search);
+    return matchCat && matchSearch;
+  });
+
+  var list = document.getElementById('plan-picker-list');
+  if (filtered.length === 0) {
+    list.innerHTML = '<div style="padding:12px;text-align:center;font-size:13px;color:#aaa">검색 결과가 없습니다</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(function(r) {
+    var sel = (r.id === selectedRecipeId) ? 'selected' : '';
+    return '<div class="picker-item '+sel+'" onclick="selectPlanRecipe(\''+r.id+'\')">'+
+      '<div><span style="font-weight:500">'+r.name+'</span> <span style="font-size:11px;color:#888;margin-left:4px">'+(r.category||'')+'</span></div>'+
+      '<div style="font-size:12px;color:#888">재료 '+(r.groups ? r.groups.reduce(function(a,b){return a+b.items.length;},0) : 0)+'개</div>'+
+    '</div>';
+  }).join('');
+}
+
+function selectPlanRecipe(id) {
+  selectedRecipeId = id;
+  var r = recipes.find(function(item){ return item.id === id; });
+  document.getElementById('plan-selected-name').innerHTML = r ? '선택: <strong>' + r.name + '</strong>' : '레시피를 선택하세요';
+  renderPlanPicker();
+}
+
+function addPlanItem() {
+  if (!selectedRecipeId) { showToast('레시피를 선택해 주세요'); return; }
+  var count = parseInt(document.getElementById('plan-count').value) || 1;
+  var r = recipes.find(function(item){ return item.id === selectedRecipeId; });
+  if (!r) return;
+
+  var existing = planItems.find(function(p){ return p.recipeId === selectedRecipeId; });
+  if (existing) {
+    existing.count += count;
+  } else {
+    planItems.push({ recipeId: r.id, name: r.name, category: r.category, count: count, groups: r.groups });
+  }
+  renderPlanList();
+  showToast(r.name + ' ' + count + '명 추가됨');
+}
+
+function renderPlanList() {
+  var list = document.getElementById('plan-list');
+  var resSec = document.getElementById('result-section');
+  if (planItems.length === 0) {
+    list.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📋</div>수업을 추가해 주세요</div>';
+    resSec.style.display = 'none';
+    updatePlanStats();
+    return;
+  }
+
+  list.innerHTML = planItems.map(function(item, idx) {
+    return '<div class="plan-card">'+
+      '<div><div style="font-size:11px;color:#888">'+(item.category||'')+'</div><div style="font-weight:600;font-size:15px">'+item.name+'</div></div>'+
+      '<div style="display:flex;align-items:center;gap:8px">'+
+        '<button class="count-btn" onclick="updatePlanCount('+idx+',-1)">-</button>'+
+        '<span class="count-num">'+item.count+'명</span>'+
+        '<button class="count-btn" onclick="updatePlanCount('+idx+',1)">+</button>'+
+        '<button class="btn-sm btn-danger" onclick="removePlanItem('+idx+')" style="margin-left:8px">삭제</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  resSec.style.display = 'block';
+  renderPlanResult();
+  updatePlanStats();
+}
+
+function updatePlanCount(idx, delta) {
+  planItems[idx].count += delta;
+  if (planItems[idx].count <= 0) planItems.splice(idx, 1);
+  renderPlanList();
+}
+
+function removePlanItem(idx) {
+  planItems.splice(idx, 1);
+  renderPlanList();
+}
+
+function clearPlan() {
+  planItems = [];
+  renderPlanList();
+}
+
+function renderPlanResult() {
+  var aggregated = {};
+  var totalPrice = 0;
+
+  planItems.forEach(function(item) {
+    if (!item.groups) return;
+    item.groups.forEach(function(g) {
+      g.items.forEach(function(ing) {
+        var key = ing.name + '_' + ing.unit;
+        var amt = (parseFloat(ing.amount) || 0) * item.count;
+        if (!aggregated[key]) {
+          aggregated[key] = { name: ing.name, amount: 0, unit: ing.unit };
+        }
+        aggregated[key].amount += amt;
+
+        var pm = priceMaster.find(function(p){ return p.name === ing.name; });
+        if (pm && pm.pricePerGram) {
+          totalPrice += amt * pm.pricePerGram;
+        }
+      });
+    });
+  });
+
+  var resList = document.getElementById('result-list');
+  var keys = Object.keys(aggregated);
+  
+  if (keys.length === 0) {
+    resList.innerHTML = '<div style="text-align:center;color:#aaa;padding:1rem">재료 정보가 없습니다</div>';
+  } else {
+    resList.innerHTML = keys.map(function(k) {
+      var item = aggregated[k];
+      return '<div class="result-row">'+
+        '<div style="font-weight:500">'+item.name+'</div>'+
+        '<div><strong style="font-size:15px">'+Math.round(item.amount * 100)/100+'</strong> '+item.unit+'</div>'+
+        '<div><span class="badge b-teal">'+item.unit+'</span></div>'+
+      '</div>';
+    }).join('');
+  }
+
+  var costInfo = document.getElementById('plan-cost-info');
+  if (totalPrice > 0) {
+    costInfo.style.display = 'block';
+    costInfo.innerHTML = '💰 <strong>예상 총 재료비: ' + Math.round(totalPrice).toLocaleString() + '원</strong> (단가 등록 기준)';
+  } else {
+    costInfo.style.display = 'none';
+  }
+}
+
+function updatePlanStats() {
+  document.getElementById('s-cls').innerText = planItems.length;
+  document.getElementById('s-stu').innerText = planItems.reduce(function(a,b){ return a + b.count; }, 0);
+  
+  var ingSet = new Set();
+  planItems.forEach(function(item) {
+    if (item.groups) {
+      item.groups.forEach(function(g) {
+        g.items.forEach(function(i){ ingSet.add(i.name); });
+      });
+    }
+  });
+  document.getElementById('s-ing').innerText = ingSet.size;
+}
+
+function copyOrderText() {
+  var aggregated = {};
+  planItems.forEach(function(item) {
+    if (!item.groups) return;
+    item.groups.forEach(function(g) {
+      g.items.forEach(function(ing) {
+        var key = ing.name + '_' + ing.unit;
+        var amt = (parseFloat(ing.amount) || 0) * item.count;
+        if (!aggregated[key]) aggregated[key] = { name: ing.name, amount: 0, unit: ing.unit };
+        aggregated[key].amount += amt;
+      });
+    });
+  });
+
+  var text = "[베이킹 발주 목록]\n";
+  Object.keys(aggregated).forEach(function(k) {
+    var item = aggregated[k];
+    text += item.name + ": " + (Math.round(item.amount*100)/100) + item.unit + "\n";
+  });
+
+  navigator.clipboard.writeText(text).then(function() {
+    showToast('클립보드에 복사되었습니다');
+  });
+}
+
+function saveOrderFromPlan() {
+  if (planItems.length === 0) return;
+  var summary = planItems.map(function(i){ return i.name + '(' + i.count + '명)'; }).join(', ');
+  
+  fetch(API_URL + '?action=saveHistory', {
+    method: 'POST',
+    body: JSON.stringify({ summary: summary, items: planItems })
+  }).then(function() {
+    showToast('발주 이력이 저장되었습니다');
+    loadData();
+  });
+}
+
+// ---------------- 레시피 관리 ----------------
+function renderRecipes() {
+  var cat = document.getElementById('recipe-filter-cat').value;
+  var search = document.getElementById('recipe-search').value.toLowerCase();
+  
+  var filtered = recipes.filter(function(r) {
+    var matchCat = !cat || r.category === cat;
+    var matchSearch = !search || r.name.toLowerCase().includes(search);
+    return matchCat && matchSearch;
+  });
+
+  var container = document.getElementById('recipe-list');
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📖</div>등록된 레시피가 없습니다</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(function(r) {
+    var photoHtml = r.photo ? '<img src="'+convertGDriveUrl(r.photo)+'" class="recipe-thumb" alt="사진">' : '<div class="recipe-thumb-placeholder">🍞</div>';
+    return '<div class="recipe-card">'+
+      '<div class="recipe-card-body" style="display:flex;gap:12px;align-items:center">'+
+        photoHtml +
+        '<div style="flex:1">'+
+          '<div style="font-size:11px;color:#888">'+(r.category||'')+'</div>'+
+          '<div style="font-weight:600;font-size:16px;margin-bottom:4px">'+r.name+'</div>'+
+          '<div>'+(r.groups?r.groups.map(function(g){ return '<span class="tag">'+g.name+' ('+g.items.length+')</span>'; }).join(''):'')+'</div>'+
+        '</div>'+
+        '<div style="display:flex;gap:6px">'+
+          '<button class="btn-sm" onclick="openDetailModal(\''+r.id+'\')">상세</button>'+
+          '<button class="btn-sm" onclick="openRecipeModal(\''+r.id+'\')">수정</button>'+
+          '<button class="btn-sm btn-danger" onclick="deleteRecipe(\''+r.id+'\')">삭제</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+function openRecipeModal(id) {
+  currentEditId = id;
+  document.getElementById('modal-title').innerText = id ? '레시피 수정' : '레시피 등록';
+  document.getElementById('bake-step-editor').innerHTML = '';
+  document.getElementById('ing-group-editor').innerHTML = '';
+  document.getElementById('step-group-editor').innerHTML = '';
+
+  if (id) {
+    var r = recipes.find(function(item){ return item.id === id; });
+    if (r) {
+      document.getElementById('r-name').value = r.name;
+      document.getElementById('r-cat').value = r.category || '기타';
+      document.getElementById('r-photo').value = r.photo || '';
+      previewPhoto();
+
+      if (r.bakeSteps) r.bakeSteps.forEach(function(b){ addBakeStep(b); });
+      if (r.groups) r.groups.forEach(function(g){ addIngGroup(g); });
+      if (r.stepGroups) r.stepGroups.forEach(function(sg){ addStepGroup(sg); });
+    }
+  } else {
+    document.getElementById('r-name').value = '';
+    document.getElementById('r-photo').value = '';
+    document.getElementById('r-photo-preview').style.display = 'none';
+    addBakeStep();
+    addIngGroup();
+    addStepGroup();
+  }
+  document.getElementById('recipe-modal').classList.add('open');
+}
+
+function closeRecipeModal() {
+  document.getElementById('recipe-modal').classList.remove('open');
+}
+
+function previewPhoto() {
+  var url = document.getElementById('r-photo').value;
+  var img = document.getElementById('r-photo-preview');
+  if (url) {
+    img.src = convertGDriveUrl(url);
+    img.style.display = 'block';
+  } else {
+    img.style.display = 'none';
+  }
+}
+
+function addBakeStep(data) {
+  var container = document.getElementById('bake-step-editor');
+  var div = document.createElement('div');
+  div.className = 'bake-step';
+  div.innerHTML = '<div class="bake-step-header">'+
+    '<input type="text" value="'+(data?data.name:'굽기')+'" placeholder="단계명 (예: 1차 굽기)" style="font-size:12px;width:120px;padding:3px 6px">'+
+    '<button class="btn-sm btn-danger" onclick="this.closest(\'.bake-step\').remove()">삭제</button>'+
+  '</div>'+
+  '<div class="bake-step-body">'+
+    '<input type="text" value="'+(data?data.temp:'')+'" placeholder="온도 (예: 180°C / 160°C)" style="flex:2;font-size:12px;padding:4px 6px">'+
+    '<input type="text" value="'+(data?data.time:'')+'" placeholder="시간 (예: 15분)" style="flex:1;font-size:12px;padding:4px 6px">'+
+  '</div>';
+  container.appendChild(div);
+}
+
+function addIngGroup(data) {
+  var container = document.getElementById('ing-group-editor');
+  var div = document.createElement('div');
+  div.className = 'ing-group';
+  div.innerHTML = '<div class="ing-group-header">'+
+    '<input type="text" value="'+(data?data.name:'반죽')+'" placeholder="그룹명" style="font-size:13px;font-weight:600;width:140px;padding:4px 8px">'+
+    '<div><button class="btn-sm" onclick="addIngRow(this)">+ 재료</button> <button class="btn-sm btn-danger" onclick="this.closest(\'.ing-group\').remove()">그룹삭제</button></div>'+
+  '</div>'+
+  '<div class="ing-group-body"></div>';
+  container.appendChild(div);
+
+  var body = div.querySelector('.ing-group-body');
+  if (data && data.items) {
+    data.items.forEach(function(item){ addIngRow(body, item); });
+  } else {
+    addIngRow(body);
+  }
+}
+
+function addIngRow(target, data) {
+  var body = target.classList && target.classList.contains('ing-group-body') ? target : target.closest('.ing-group').querySelector('.ing-group-body');
+  var div = document.createElement('div');
+  div.className = 'ing-row';
+  div.innerHTML = '<input type="text" value="'+(data?data.name:'')+'" placeholder="재료명" style="font-size:12px;padding:4px 6px">'+
+    '<input type="number" value="'+(data?data.amount:'')+'" placeholder="수량" style="font-size:12px;padding:4px 6px">'+
+    '<select style="font-size:12px;padding:4px 6px"><option '+(data&&data.unit==='g'?'selected':'')+'>g</option><option '+(data&&data.unit==='ml'?'selected':'')+'>ml</option><option '+(data&&data.unit==='개'?'selected':'')+'>개</option><option '+(data&&data.unit==='tbsp'?'selected':'')+'>tbsp</option><option '+(data&&data.unit==='tsp'?'selected':'')+'>tsp</option></select>'+
+    '<button class="count-btn" onclick="this.closest(\'.ing-row\').remove()" style="color:#c0392b">✕</button>';
+  body.appendChild(div);
+}
+
+function addStepGroup(data) {
+  var container = document.getElementById('step-group-editor');
+  var div = document.createElement('div');
+  div.className = 'step-group';
+  div.innerHTML = '<div class="step-group-header">'+
+    '<input type="text" value="'+(data?data.name:'공정')+'" placeholder="그룹명" style="font-size:13px;font-weight:600;width:140px;padding:4px 8px">'+
+    '<div><button class="btn-sm" onclick="addStepRow(this)">+ 순서</button> <button class="btn-sm btn-danger" onclick="this.closest(\'.step-group\').remove()">그룹삭제</button></div>'+
+  '</div>'+
+  '<div class="step-group-body"></div>';
+  container.appendChild(div);
+
+  var body = div.querySelector('.step-group-body');
+  if (data && data.steps) {
+    data.steps.forEach(function(s){ addStepRow(body, s); });
+  } else {
+    addStepRow(body);
+  }
+}
+
+function addStepRow(target, text) {
+  var body = target.classList && target.classList.contains('step-group-body') ? target : target.closest('.step-group').querySelector('.step-group-body');
+  var idx = body.children.length + 1;
+  var div = document.createElement('div');
+  div.className = 'step-row';
+  div.innerHTML = '<div class="step-num-badge">'+idx+'</div>'+
+    '<textarea placeholder="공정 내용 설명..." style="flex:1;font-size:12px;padding:6px;height:42px;resize:vertical">'+(text||'')+'</textarea>'+
+    '<button class="count-btn" onclick="removeStepRow(this)" style="color:#c0392b;margin-top:7px">✕</button>';
+  body.appendChild(div);
+}
+
+function removeStepRow(btn) {
+  var body = btn.closest('.step-group-body');
+  btn.closest('.step-row').remove();
+  Array.from(body.children).forEach(function(row, idx) {
+    row.querySelector('.step-num-badge').innerText = idx + 1;
+  });
+}
+
+function saveRecipe() {
+  var name = document.getElementById('r-name').value.trim();
+  if (!name) { showToast('레시피명을 입력해 주세요'); return; }
+
+  var category = document.getElementById('r-cat').value;
+  var photo = document.getElementById('r-photo').value.trim();
+
+  var bakeSteps = [];
+  document.querySelectorAll('#bake-step-editor .bake-step').forEach(function(el) {
+    var inputs = el.querySelectorAll('input');
+    bakeSteps.push({ name: inputs[0].value, temp: inputs[1].value, time: inputs[2].value });
+  });
+
+  var groups = [];
+  document.querySelectorAll('#ing-group-editor .ing-group').forEach(function(el) {
+    var gName = el.querySelector('.ing-group-header input').value.trim() || '재료';
+    var items = [];
+    el.querySelectorAll('.ing-row').forEach(function(row) {
+      var inputs = row.querySelectorAll('input, select');
+      var iName = inputs[0].value.trim();
+      var iAmt = inputs[1].value;
+      var iUnit = inputs[2].value;
+      if (iName) items.push({ name: iName, amount: iAmt, unit: iUnit });
+    });
+    if (items.length > 0) groups.push({ name: gName, items: items });
+  });
+
+  var stepGroups = [];
+  document.querySelectorAll('#step-group-editor .step-group').forEach(function(el) {
+    var sgName = el.querySelector('.step-group-header input').value.trim() || '공정';
+    var steps = [];
+    el.querySelectorAll('.step-row textarea').forEach(function(ta) {
+      if (ta.value.trim()) steps.push(ta.value.trim());
+    });
+    if (steps.length > 0) stepGroups.push({ name: sgName, steps: steps });
+  });
+
+  var payload = {
+    id: currentEditId || ('r_' + Date.now()),
+    name: name,
+    category: category,
+    photo: photo,
+    bakeSteps: bakeSteps,
+    groups: groups,
+    stepGroups: stepGroups
+  };
+
+  fetch(API_URL + '?action=saveRecipe', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }).then(function() {
+    showToast('레시피가 저장되었습니다');
+    closeRecipeModal();
+    loadData();
+  });
+}
+
+function deleteRecipe(id) {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  fetch(API_URL + '?action=deleteRecipe', {
+    method: 'POST',
+    body: JSON.stringify({ id: id })
+  }).then(function() {
+    showToast('삭제되었습니다');
+    loadData();
+  });
+}
+
+function openDetailModal(id) {
+  var r = recipes.find(function(item){ return item.id === id; });
+  if (!r) return;
+  currentDetailRecipe = r;
+
+  document.getElementById('detail-title').innerText = r.name;
+  var html = '';
+
+  if (r.photo) {
+    html += '<img src="'+convertGDriveUrl(r.photo)+'" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-bottom:12px" alt="사진">';
+  }
+
+  if (r.bakeSteps && r.bakeSteps.length > 0) {
+    html += '<div style="margin-bottom:12px">';
+    r.bakeSteps.forEach(function(b) {
+      html += '<div class="temp-box">🔥 <strong>'+b.name+':</strong> '+b.temp+' / ⏱️ '+b.time+'</div>';
+    });
+    html += '</div>';
+  }
+
+  if (r.groups && r.groups.length > 0) {
+    html += '<div style="font-weight:600;margin-bottom:6px">📋 재료 (1인분 기준)</div>';
+    r.groups.forEach(function(g) {
+      html += '<div style="background:#f5f4f0;border-radius:8px;padding:8px 12px;margin-bottom:8px">'+
+        '<div style="font-weight:600;font-size:12px;color:#666;margin-bottom:4px">'+g.name+'</div>';
+      g.items.forEach(function(i) {
+        html += '<div style="display:flex;justify-content:space-between;font-size:13px;padding:2px 0">'+
+          '<span>'+i.name+'</span><strong>'+i.amount+i.unit+'</strong>'+
+        '</div>';
+      });
+      html += '</div>';
+    });
+  }
+
+  if (r.stepGroups && r.stepGroups.length > 0) {
+    html += '<div style="font-weight:600;margin:12px 0 6px">👩‍🍳 제조공정</div>';
+    r.stepGroups.forEach(function(sg) {
+      html += '<div style="font-size:13px;font-weight:600;color:#666;margin-top:6px">'+sg.name+'</div>';
+      sg.steps.forEach(function(s, idx) {
+        html += '<div style="display:flex;gap:8px;margin:4px 0;font-size:13px">'+
+          '<span class="step-num-badge" style="width:18px;height:18px;font-size:10px">'+(idx+1)+'</span>'+
+          '<span style="flex:1;line-height:1.4">'+s+'</span>'+
+        '</div>';
+      });
+    });
+  }
+
+  document.getElementById('detail-content').innerHTML = html;
+  document.getElementById('detail-modal').classList.add('open');
+}
+
+function printRecipe() {
+  if (!currentDetailRecipe) return;
+  var r = currentDetailRecipe;
+  var win = window.open('', '_blank');
+  var html = '<html><head><title>'+r.name+' - 레시피</title><style>'+
+    'body{font-family:sans-serif;padding:20px;color:#1a1a18} h1{font-size:20px;border-bottom:2px solid #1a1a18;padding-bottom:8px} '+
+    '.box{border:1px solid #ddd;padding:10px;border-radius:6px;margin-bottom:10px} .row{display:flex;justify-content:space-between;padding:3px 0}'+
+  '</style></head><body>'+
+  '<h1>'+r.name+' <span style="font-size:13px;font-weight:normal">('+ (r.category||'') +')</span></h1>';
+
+  if (r.bakeSteps) {
+    r.bakeSteps.forEach(function(b) {
+      html += '<div class="box">🔥 <strong>'+b.name+':</strong> '+b.temp+' | '+b.time+'</div>';
+    });
+  }
+
+  if (r.groups) {
+    html += '<h3>[ 재료 목록 ]</h3>';
+    r.groups.forEach(function(g) {
+      html += '<div class="box"><strong>'+g.name+'</strong>';
+      g.items.forEach(function(i) {
+        html += '<div class="row"><span>'+i.name+'</span><span>'+i.amount+i.unit+'</span></div>';
+      });
+      html += '</div>';
+    });
+  }
+
+  if (r.stepGroups) {
+    html += '<h3>[ 제조 공정 ]</h3>';
+    r.stepGroups.forEach(function(sg) {
+      html += '<div class="box"><strong>'+sg.name+'</strong>';
+      sg.steps.forEach(function(s, idx) {
+        html += '<div style="margin:4px 0">'+(idx+1)+'. '+s+'</div>';
+      });
+      html += '</div>';
+    });
+  }
+
+  html += '</body></html>';
+  win.document.write(html);
+  win.document.close();
+  win.print();
+}
+
+function printAllRecipes() {
+  if (recipes.length === 0) return;
+  var win = window.open('', '_blank');
+  var html = '<html><head><title>전체 레시피 인쇄</title><style>'+
+    'body{font-family:sans-serif;padding:20px} .page{page-break-after:always;border-bottom:1px dashed #ccc;padding-bottom:20px;margin-bottom:20px}'+
+    '.row{display:flex;justify-content:space-between;padding:2px 0}'+
+  '</style></head><body>';
+
+  recipes.forEach(function(r) {
+    html += '<div class="page"><h2>'+r.name+' ('+(r.category||'')+')</h2>';
+    if (r.groups) {
+      r.groups.forEach(function(g) {
+        html += '<h4>'+g.name+'</h4>';
+        g.items.forEach(function(i) {
+          html += '<div class="row"><span>'+i.name+'</span><span>'+i.amount+i.unit+'</span></div>';
+        });
+      });
+    }
+    html += '</div>';
+  });
+
+  html += '</body></html>';
+  win.document.write(html);
+  win.document.close();
+  win.print();
+}
+
+// ---------------- 발주 이력 ----------------
+function renderHistory() {
+  var container = document.getElementById('history-list');
+  if (history.length === 0) {
+    container.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📦</div>발주 이력이 없습니다</div>';
+    return;
+  }
+
+  container.innerHTML = history.map(function(h) {
+    var dateStr = h.date ? new Date(h.date).toLocaleString() : '';
+    return '<div class="history-card">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:6px">'+
+        '<span style="font-weight:600">'+h.summary+'</span>'+
+        '<span style="font-size:12px;color:#888">'+dateStr+'</span>'+
+      '</div>'+
+      '<button class="btn-sm" onclick="loadHistoryToPlan(\''+h.id+'\')">수업계획으로 불러오기</button>'+
+    '</div>';
+  }).join('');
+}
+
+function loadHistoryToPlan(id) {
+  var h = history.find(function(item){ return item.id === id; });
+  if (!h || !h.items) return;
+  planItems = JSON.parse(JSON.stringify(h.items));
+  switchTab('plan');
+  renderPlanList();
+  showToast('이력을 불러왔습니다');
+}
+
+// ---------------- 재료 단가 관리 ----------------
+function renderIngList() {
+  var search = document.getElementById('ing-list-search').value.toLowerCase();
+  var ingMap = {};
+
+  recipes.forEach(function(r) {
+    if (r.groups) {
+      r.groups.forEach(function(g) {
+        g.items.forEach(function(i) {
+          if (!search || i.name.toLowerCase().includes(search)) {
+            ingMap[i.name] = i.unit;
+          }
+        });
+      });
+    }
+  });
+
+  var keys = Object.keys(ingMap);
+  var wrap = document.getElementById('ing-list-wrap');
+
+  if (keys.length === 0) {
+    wrap.innerHTML = '<div style="font-size:12px;color:#aaa;text-align:center;padding:10px">등록된 레시피 재료가 없습니다</div>';
+    return;
+  }
+
+  wrap.innerHTML = '<div class="ing-list-grid">' + keys.map(function(k) {
+    var pm = priceMaster.find(function(p){ return p.name === k; });
+    var cls = pm ? 'has-price' : 'no-price';
+    return '<div class="ing-list-item '+cls+'" onclick="selectIngToPrice(\''+k+'\', \''+ingMap[k]+'\')">'+
+      '<span>'+k+'</span>'+
+    '</div>';
+  }).join('') + '</div>';
+}
+
+function selectIngToPrice(name, unit) {
+  document.getElementById('pi-name').value = name;
+  document.getElementById('pi-unit').value = unit || 'g';
+  var pm = priceMaster.find(function(p){ return p.name === name; });
+  if (pm) {
+    document.getElementById('pi-amount').value = pm.amount;
+    document.getElementById('pi-price').value = pm.price;
+  } else {
+    document.getElementById('pi-amount').value = '';
+    document.getElementById('pi-price').value = '';
+  }
+}
+
+function addPriceItem() {
+  var name = document.getElementById('pi-name').value.trim();
+  var amount = parseFloat(document.getElementById('pi-amount').value);
+  var unit = document.getElementById('pi-unit').value;
+  var price = parseFloat(document.getElementById('pi-price').value);
+
+  if (!name || isNaN(amount) || isNaN(price)) {
+    showToast('올바른 값을 입력해 주세요');
+    return;
+  }
+
+  var pricePerGram = price / amount;
+
+  fetch(API_URL + '?action=savePrice', {
+    method: 'POST',
+    body: JSON.stringify({ name: name, amount: amount, unit: unit, price: price, pricePerGram: pricePerGram })
+  }).then(function() {
+    showToast('단가가 저장되었습니다');
+    loadData();
+  });
+}
+
+function renderPriceList() {
+  var search = document.getElementById('price-search').value.toLowerCase();
+  var filtered = priceMaster.filter(function(p){
+    return !search || p.name.toLowerCase().includes(search);
+  });
+
+  var tbody = document.getElementById('price-table-body');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="padding:2rem;text-align:center;color:#aaa">등록된 단가가 없습니다</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(function(p) {
+    return '<tr>'+
+      '<td style="padding:10px 14px;border-bottom:1px solid #f0efeb;font-weight:500">'+p.name+'</td>'+
+      '<td style="padding:10px 14px;border-bottom:1px solid #f0efeb;text-align:center">'+p.amount+p.unit+'</td>'+
+      '<td style="padding:10px 14px;border-bottom:1px solid #f0efeb;text-align:right">'+Math.round(p.price).toLocaleString()+'원</td>'+
+      '<td style="padding:10px 14px;border-bottom:1px solid #f0efeb;text-align:right;color:#888">'+(Math.round(p.pricePerGram*100)/100)+'원/'+p.unit+'</td>'+
+      '<td style="padding:10px 14px;border-bottom:1px solid #f0efeb;text-align:center">'+
+        '<button class="btn-sm btn-danger" onclick="deletePrice(\''+p.name+'\')">삭제</button>'+
+      '</td>'+
+    '</tr>';
+  }).join('');
+}
+
+function deletePrice(name) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  fetch(API_URL + '?action=deletePrice', {
+    method: 'POST',
+    body: JSON.stringify({ name: name })
+  }).then(function() {
+    showToast('삭제되었습니다');
+    loadData();
+  });
+}
+
+// ---------------- 카테고리 관리 ----------------
+function openCatModal() {
+  renderCatList();
+  document.getElementById('cat-modal').classList.add('open');
+}
+function closeCatModal() { document.getElementById('cat-modal').classList.remove('open'); }
+
+function renderCatList() {
+  var container = document.getElementById('cat-list-editor');
+  container.innerHTML = categories.map(function(c, idx) {
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f0efeb">'+
+      '<span>'+c+'</span>'+
+      '<button class="btn-sm btn-danger" onclick="deleteCat('+idx+')">삭제</button>'+
+    '</div>';
+  }).join('');
+}
+
+function addCat() {
+  var val = document.getElementById('new-cat-input').value.trim();
+  if (val && !categories.includes(val)) {
+    categories.push(val);
+    saveCategories();
+    document.getElementById('new-cat-input').value = '';
+  }
+}
+
+function deleteCat(idx) {
+  categories.splice(idx, 1);
+  saveCategories();
+}
+
+function saveCategories() {
+  fetch(API_URL + '?action=saveCategories', {
+    method: 'POST',
+    body: JSON.stringify({ categories: categories })
+  }).then(function() {
+    renderCatList();
+    updateCategoryDropdowns();
+    showToast('카테고리가 저장되었습니다');
+  });
+}
+
+// ---------------- 재료비 명세서 & 견적서 ----------------
+function openCostPrintModal() {
+  var cat = document.getElementById('cost-cat-filter').value;
+  var checklist = document.getElementById('cost-recipe-checklist');
+  var filtered = recipes.filter(function(r){ return !cat || r.category === cat; });
+
+  checklist.innerHTML = filtered.map(function(r) {
+    return '<label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer">'+
+      '<input type="checkbox" value="'+r.id+'" checked> <span>'+r.name+'</span> <span style="font-size:11px;color:#888">('+r.category+')</span>'+
+    '</label>';
+  }).join('');
+
+  document.getElementById('cost-print-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('cost-print-modal').classList.add('open');
+}
+function closeCostPrintModal() { document.getElementById('cost-print-modal').classList.remove('open'); }
+
+function filterCostRecipes() {
+  var search = document.getElementById('cost-recipe-search').value.toLowerCase();
+  document.querySelectorAll('#cost-recipe-checklist label').forEach(function(lbl) {
+    var txt = lbl.innerText.toLowerCase();
+    lbl.style.display = txt.includes(search) ? 'flex' : 'none';
+  });
+}
+
+function selectAllCostRecipes() {
+  document.querySelectorAll('#cost-recipe-checklist input').forEach(function(cb){ cb.checked = true; });
+}
+function deselectAllCostRecipes() {
+  document.querySelectorAll('#cost-recipe-checklist input').forEach(function(cb){ cb.checked = false; });
+}
+
+function printCostSheet() {
+  var selected = Array.from(document.querySelectorAll('#cost-recipe-checklist input:checked')).map(function(cb){ return cb.value; });
+  if (selected.length === 0) { alert('제품을 선택해 주세요'); return; }
+
+  var target = document.getElementById('cost-print-target').value || '';
+  var date = document.getElementById('cost-print-date').value || '';
+  var persons = parseInt(document.getElementById('cost-print-persons').value) || 1;
+  var unitStr = document.getElementById('cost-print-unit').value || '인';
+
+  var win = window.open('', '_blank');
+  var html = '<html><head><title>재료비 명세서</title><style>'+
+    'body{font-family:sans-serif;padding:20px} table{width:100%;border-collapse:collapse;margin-top:15px} '+
+    'th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:12px} th{background:#f5f4f0}'+
+  '</style></head><body>'+
+  '<h2>재료비 명세서</h2>'+
+  '<div>제출처: '+target+' | 작성일: '+date+' | 기준: '+persons+unitStr+'</div>'+
+  '<table><thead><tr><th>카테고리</th><th>제품명</th><th>재료명</th><th>수량('+unitStr+')</th><th>단위</th><th>단가</th><th>금액</th></tr></thead><tbody>';
+
+  var grandTotal = 0;
+  selected.forEach(function(id) {
+    var r = recipes.find(function(item){ return item.id === id; });
+    if (r && r.groups) {
+      r.groups.forEach(function(g) {
+        g.items.forEach(function(i) {
+          var amt = (parseFloat(i.amount)||0) * persons;
+          var pm = priceMaster.find(function(p){ return p.name === i.name; });
+          var price = pm ? pm.pricePerGram : 0;
+          var total = amt * price;
+          grandTotal += total;
+
+          html += '<tr>'+
+            '<td>'+(r.category||'')+'</td>'+
+            '<td>'+r.name+'</td>'+
+            '<td>'+i.name+'</td>'+
+            '<td style="text-align:right">'+amt+'</td>'+
+            '<td>'+i.unit+'</td>'+
+            '<td style="text-align:right">'+Math.round(price).toLocaleString()+'원</td>'+
+            '<td style="text-align:right">'+Math.round(total).toLocaleString()+'원</td>'+
+          '</tr>';
+        });
+      });
+    }
+  });
+
+  html += '</tbody><tfoot><tr><th colspan="6" style="text-align:right">총 합계</th><th style="text-align:right">'+Math.round(grandTotal).toLocaleString()+'원</th></tr></tfoot></table></body></html>';
+  win.document.write(html);
+  win.document.close();
+  win.print();
+}
+
+function openSumModal() {
+  renderSumRecipeList();
+  document.getElementById('sum-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('sum-modal').classList.add('open');
+}
+function closeSumModal() { document.getElementById('sum-modal').classList.remove('open'); }
+
+function renderSumRecipeList() {
+  var cat = document.getElementById('sum-cat').value;
+  var list = document.getElementById('sum-recipe-list');
+  var filtered = recipes.filter(function(r){ return !cat || r.category === cat; });
+
+  list.innerHTML = filtered.map(function(r) {
+    return '<label style="display:flex;align-items:center;gap:6px;padding:4px 0;cursor:pointer">'+
+      '<input type="checkbox" value="'+r.id+'" checked> <span>'+r.name+'</span>'+
+    '</label>';
+  }).join('');
+}
+
+function selectAllSum() { document.querySelectorAll('#sum-recipe-list input').forEach(function(cb){ cb.checked = true; }); }
+function deselectAllSum() { document.querySelectorAll('#sum-recipe-list input').forEach(function(cb){ cb.checked = false; }); }
+
+function printSumSheet() {
+  var selected = Array.from(document.querySelectorAll('#sum-recipe-list input:checked')).map(function(cb){ return cb.value; });
+  if (selected.length === 0) { alert('제품을 선택해 주세요'); return; }
+
+  var target = document.getElementById('sum-target').value || '';
+  var date = document.getElementById('sum-date').value || '';
+  var persons = parseInt(document.getElementById('sum-persons').value) || 1;
+  var unitStr = document.getElementById('sum-unit').value || '인';
+
+  var sumMap = {};
+  selected.forEach(function(id) {
+    var r = recipes.find(function(item){ return item.id === id; });
+    if (r && r.groups) {
+      r.groups.forEach(function(g) {
+        g.items.forEach(function(i) {
+          var key = i.name + '_' + i.unit;
+          if (!sumMap[key]) sumMap[key] = { name: i.name, unit: i.unit, amount: 0 };
+          sumMap[key].amount += (parseFloat(i.amount)||0) * persons;
+        });
+      });
+    }
+  });
+
+  var win = window.open('', '_blank');
+  var html = '<html><head><title>재료 합산 견적서</title><style>'+
+    'body{font-family:sans-serif;padding:20px} table{width:100%;border-collapse:collapse;margin-top:15px} '+
+    'th,td{border:1px solid #ccc;padding:8px;text-align:left;font-size:12px} th{background:#f5f4f0}'+
+  '</style></head><body>'+
+  '<h2>재료 합산 견적서</h2>'+
+  '<div>제출처: '+target+' | 작성일: '+date+' | 기준: '+persons+unitStr+'</div>'+
+  '<table><thead><tr><th>재료명</th><th>총 필요수량</th><th>단위</th><th>추정 단가</th><th>합산 금액</th></tr></thead><tbody>';
+
+  var grandTotal = 0;
+  Object.keys(sumMap).forEach(function(k) {
+    var item = sumMap[k];
+    var pm = priceMaster.find(function(p){ return p.name === item.name; });
+    var price = pm ? pm.pricePerGram : 0;
+    var total = item.amount * price;
+    grandTotal += total;
+
+    html += '<tr>'+
+      '<td>'+item.name+'</td>'+
+      '<td style="text-align:right">'+Math.round(item.amount*100)/100+'</td>'+
+      '<td>'+item.unit+'</td>'+
+      '<td style="text-align:right">'+Math.round(price).toLocaleString()+'원</td>'+
+      '<td style="text-align:right">'+Math.round(total).toLocaleString()+'원</td>'+
+    '</tr>';
+  });
+
+  html += '</tbody><tfoot><tr><th colspan="4" style="text-align:right">총 합계</th><th style="text-align:right">'+Math.round(grandTotal).toLocaleString()+'원</th></tr></tfoot></table></body></html>';
+  win.document.write(html);
+  win.document.close();
+  win.print();
+}
+
 /* ----------------------------------------------------
-   [추가된 기능] 스타일 적용된 엑셀 다운로드 함수
+   [엑셀 다운로드 기능 - ExcelJS 적용]
 ---------------------------------------------------- */
 
-// 1. 재료비 명세서 엑셀 다운로드 (스타일링 적용)
+// 1. 재료비 명세서 엑셀 다운로드 (스타일 적용)
 async function downloadCostExcel() {
   const selectedCheckboxes = document.querySelectorAll('#cost-recipe-checklist input[type="checkbox"]:checked');
   if (selectedCheckboxes.length === 0) {
@@ -422,7 +1400,6 @@ async function downloadCostExcel() {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('재료비 명세서');
 
-  // 헤더 스타일 정의
   const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'F2F4F7' } };
   const borderThin = {
     top: { style: 'thin', color: { argb: 'D1D5DB' } },
@@ -431,12 +1408,10 @@ async function downloadCostExcel() {
     right: { style: 'thin', color: { argb: 'D1D5DB' } }
   };
 
-  // 제목 및 기본정보 추가
   worksheet.addRow([`재료비 명세서 (${target})`]);
   worksheet.addRow([`작성일: ${date} | 기준: ${persons}${unitStr}`]);
-  worksheet.addRow([]); // 공백
+  worksheet.addRow([]);
 
-  // 테이블 헤더
   const headerRow = worksheet.addRow(['카테고리', '제품명', '재료명', `수량(${unitStr})`, '단위', '단가(원)', '금액(원)']);
   headerRow.font = { bold: true, size: 11 };
   headerRow.eachCell((cell) => {
@@ -445,7 +1420,6 @@ async function downloadCostExcel() {
     cell.border = borderThin;
   });
 
-  // 데이터 수집 및 작성
   let grandTotal = 0;
   
   selectedCheckboxes.forEach(cb => {
@@ -453,53 +1427,52 @@ async function downloadCostExcel() {
     const recipe = recipes.find(r => r.id === recipeId);
     if (!recipe) return;
 
-    if (recipe.ingredients) {
-      recipe.ingredients.forEach(ing => {
-        const qty = (parseFloat(ing.amount) || 0) * persons;
-        const price = parseFloat(ing.price) || 0;
-        const total = qty * price;
-        grandTotal += total;
+    if (recipe.groups) {
+      recipe.groups.forEach(g => {
+        g.items.forEach(ing => {
+          const qty = (parseFloat(ing.amount) || 0) * persons;
+          const pm = priceMaster.find(p => p.name === ing.name);
+          const price = pm ? pm.pricePerGram : 0;
+          const total = qty * price;
+          grandTotal += total;
 
-        const row = worksheet.addRow([
-          recipe.category || '',
-          recipe.name || '',
-          ing.name || '',
-          qty,
-          ing.unit || '',
-          price,
-          total
-        ]);
+          const row = worksheet.addRow([
+            recipe.category || '',
+            recipe.name || '',
+            ing.name || '',
+            qty,
+            ing.unit || '',
+            price,
+            total
+          ]);
 
-        row.eachCell((cell, colNumber) => {
-          cell.border = borderThin;
-          if (colNumber === 4 || colNumber === 6 || colNumber === 7) {
-            cell.numFmt = '#,##0';
-            cell.alignment = { horizontal: 'right' };
-          }
+          row.eachCell((cell, colNumber) => {
+            cell.border = borderThin;
+            if (colNumber === 4 || colNumber === 6 || colNumber === 7) {
+              cell.numFmt = '#,##0';
+              cell.alignment = { horizontal: 'right' };
+            }
+          });
         });
       });
     }
   });
 
-  // 합계 행
   const totalRow = worksheet.addRow(['총 합계', '', '', '', '', '', grandTotal]);
   worksheet.mergeCells(`A${totalRow.number}:F${totalRow.number}`);
-  totalRow.font = { bold: true, color: { argb: '111827' } };
+  totalRow.font = { bold: true };
   totalRow.getCell(1).alignment = { horizontal: 'center' };
   totalRow.getCell(7).numFmt = '#,##0';
   totalRow.getCell(7).alignment = { horizontal: 'right' };
   totalRow.eachCell(cell => cell.border = borderThin);
 
-  // 너비 자동 조절
-  worksheet.columns.forEach(column => {
-    column.width = 16;
-  });
+  worksheet.columns.forEach(column => { column.width = 16; });
 
   const buffer = await workbook.xlsx.writeBuffer();
   saveAs(new Blob([buffer]), `재료비명세서_${date}.xlsx`);
 }
 
-// 2. 재료 합산 견적서 엑셀 다운로드 (스타일링 적용)
+// 2. 재료 합산 견적서 엑셀 다운로드 (스타일 적용)
 async function downloadSumExcel() {
   const selectedCheckboxes = document.querySelectorAll('#sum-recipe-list input[type="checkbox"]:checked');
   if (selectedCheckboxes.length === 0) {
@@ -535,17 +1508,19 @@ async function downloadSumExcel() {
     cell.border = borderThin;
   });
 
-  // 재료 합산 로직
   const sumMap = {};
   selectedCheckboxes.forEach(cb => {
     const recipe = recipes.find(r => r.id === cb.value);
-    if (recipe && recipe.ingredients) {
-      recipe.ingredients.forEach(ing => {
-        const key = `${ing.name}_${ing.unit}`;
-        if (!sumMap[key]) {
-          sumMap[key] = { name: ing.name, unit: ing.unit, amount: 0, price: ing.price || 0 };
-        }
-        sumMap[key].amount += (parseFloat(ing.amount) || 0) * persons;
+    if (recipe && recipe.groups) {
+      recipe.groups.forEach(g => {
+        g.items.forEach(ing => {
+          const key = `${ing.name}_${ing.unit}`;
+          if (!sumMap[key]) {
+            const pm = priceMaster.find(p => p.name === ing.name);
+            sumMap[key] = { name: ing.name, unit: ing.unit, amount: 0, price: pm ? pm.pricePerGram : 0 };
+          }
+          sumMap[key].amount += (parseFloat(ing.amount) || 0) * persons;
+        });
       });
     }
   });
@@ -585,6 +1560,9 @@ async function downloadSumExcel() {
   const buffer = await workbook.xlsx.writeBuffer();
   saveAs(new Blob([buffer]), `재료합산견적서_${date}.xlsx`);
 }
+
+// 초기화 데이터 로드
+loadData();
 </script>
 </body>
 </html>
