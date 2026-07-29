@@ -1670,7 +1670,8 @@ function printSumSheet() {
   var date = document.getElementById('sum-date').value;
   var persons = parseInt(document.getElementById('sum-persons').value) || 1;
   var pUnit = document.getElementById('sum-unit').value;
-  var lossRate = parseFloat(document.getElementById('sum-loss-rate') ? document.getElementById('sum-loss-rate').value : 5) || 5;
+  var lossRateEl = document.getElementById('sum-loss-rate');
+  var lossRate = lossRateEl ? (parseFloat(lossRateEl.value) || 0) : 5;
 
   var checkedIds = [];
   document.querySelectorAll('.sum-chk:checked').forEach(function(cb){ checkedIds.push(cb.value); });
@@ -1787,11 +1788,11 @@ function printSumSheet() {
 
     // 합계 박스
     '<div style="margin-top:20px;display:flex;flex-direction:column;align-items:flex-end;gap:6px">' +
-    '<div style="display:flex;gap:60px;font-size:12px;color:#666">' +
-    '<span>재료비 합계</span><span>' + grandTotal.toLocaleString() + '원</span>' +
-    '</div>' +
-    (lossRate > 0 ? '<div style="display:flex;gap:60px;font-size:12px;color:#c0392b"><span>손실률 ' + lossRate + '% 적용</span><span>+ ' + lossAmt.toLocaleString() + '원</span></div>' : '') +
-    (lossRate > 0 ? '<div style="display:flex;gap:60px;font-size:12px;color:#666"><span>소계</span><span>' + totalWithLoss.toLocaleString() + '원</span></div>' : '') +
+    (lossRate > 0 ?
+      '<div style="display:flex;gap:60px;font-size:12px;color:#666"><span>재료비 합계</span><span>' + grandTotal.toLocaleString() + '원</span></div>' +
+      '<div style="display:flex;gap:60px;font-size:12px;color:#c0392b"><span>손실률 ' + lossRate + '% 적용</span><span>+ ' + lossAmt.toLocaleString() + '원</span></div>' +
+      '<div style="display:flex;gap:60px;font-size:12px;color:#666"><span>소계</span><span>' + totalWithLoss.toLocaleString() + '원</span></div>'
+    : '') +
     (diff>0?'<div style="font-size:10px;color:#999">※ 10원 단위 절삭 (-'+diff+'원)</div>':'') +
     '<div style="display:flex;gap:60px;font-size:16px;font-weight:700;border-top:2px solid #333;padding-top:8px;margin-top:4px">' +
     '<span>총 금액</span><span style="color:#1a5276">' + totalCut.toLocaleString() + '원</span>' +
