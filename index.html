@@ -527,7 +527,7 @@ async function loadAll() {
   await Promise.all([loadRecipes(), loadHistory()]);
 }
 
-async async function loadRecipes() {
+async function loadRecipes() {
   var data = await api('getRecipes');
   if (!data) return;
   recipes = data.recipes || [];
