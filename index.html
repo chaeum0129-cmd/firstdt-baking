@@ -1074,19 +1074,30 @@ function renderHistory(orders) {
     el.innerHTML = '<div class="empty"><div style="font-size:32px;margin-bottom:8px">📦</div>발주 이력이 없습니다</div>'; return;
   }
 
-  // 월별 그룹핑 (날짜 형식: "2026. 10. 6." 또는 "2026-10-06" 모두 처리)
+  // 월별 그룹핑 - 정렬용 키(YYYYMM)와 표시용 키 분리
   var months = {};
+  var monthLabel = {};
   orders.forEach(function(o, idx) {
-    var key = '기타';
+    var sortKey = '000000';
+    var label = '기타';
     if (o.date) {
       var m1 = o.date.match(/(\d{4})\. *(\d{1,2})\./);
-      var m2 = o.date.match(/(\d{4})-(\d{2})/);
-      if (m1) key = m1[1] + '. ' + m1[2] + '.';
-      else if (m2) key = m2[1] + '-' + m2[2];
-      else key = o.date.substring(0, 7);
+      var m2 = o.date.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (m1) {
+        var mm = m1[2].length === 1 ? '0' + m1[2] : m1[2];
+        sortKey = m1[1] + mm;
+        label = m1[1] + '. ' + m1[2] + '.';
+      } else if (m2) {
+        sortKey = m2[1] + m2[2];
+        label = m2[1] + '. ' + parseInt(m2[2]) + '.';
+      } else {
+        sortKey = o.date.substring(0, 7).replace('-','');
+        label = o.date.substring(0, 7);
+      }
     }
-    if (!months[key]) months[key] = [];
-    months[key].push({order: o, idx: idx});
+    if (!months[sortKey]) months[sortKey] = [];
+    months[sortKey].push({order: o, idx: idx});
+    monthLabel[sortKey] = label;
   });
 
   el.innerHTML = '';
@@ -1094,15 +1105,16 @@ function renderHistory(orders) {
 
   sortedMonths.forEach(function(month, mi) {
     var group = months[month];
+    var monthDisplay = monthLabel[month] || month;
     var isOpen = mi === 0;
-    var safeMonth = month.replace(/\./g,'_').replace(/\s/g,'_');
+    var safeMonth = month;
 
     // 월 헤더 (접기/펼치기)
     var header = document.createElement('div');
     header.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--color-background-secondary);border-radius:var(--border-radius-md);cursor:pointer;margin-bottom:6px;user-select:none';
     header.innerHTML =
       '<div style="display:flex;align-items:center;gap:8px">' +
-      '<span style="font-weight:500;font-size:14px">' + month + '</span>' +
+      '<span style="font-weight:500;font-size:14px">' + monthDisplay + '</span>' +
       '<span style="font-size:12px;color:var(--color-text-secondary)">총 ' + group.length + '건</span></div>' +
       '<span id="arr-' + safeMonth + '" style="font-size:12px;color:var(--color-text-secondary)">' + (isOpen?'▲':'▼') + '</span>';
     el.appendChild(header);
