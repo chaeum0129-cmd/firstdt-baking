@@ -713,7 +713,7 @@ function copyOrderText() {
   navigator.clipboard.writeText(lines.join('\n')).then(function(){ showToast('복사됐어요!'); });
 }
 
-async function saveOrderFromPlan() {
+async async function saveOrderFromPlan() {
   if (!planItems.length) { showToast('수업을 추가해 주세요'); return; }
   var totals = {};
   planItems.forEach(function(p) {
